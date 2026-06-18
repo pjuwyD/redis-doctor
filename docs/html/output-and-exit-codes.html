@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Output formats &amp; exit codes · Redis Doctor docs</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="getting-started.html">Getting started</a></li>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="commands/index.html">Commands</a></li>
+<li><a href="commands/analyze.html">analyze</a></li>
+<li><a href="commands/scan-keys.html">scan-keys</a></li>
+<li><a href="commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="commands/config-check.html">config-check</a></li>
+<li><a href="commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="commands/report.html">report</a></li>
+<li><a href="commands/diff.html">diff</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="findings-catalog.html">Findings catalog</a></li>
+<li><a class="active" href="output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="guides/explore.html">Explore</a></li>
+<li><a href="guides/tui.html">Terminal UI</a></li>
+<li><a href="guides/gui.html">Web dashboard</a></li>
+<li><a href="guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="developer/architecture.html">Architecture</a></li>
+<li><a href="developer/collectors.html">Collectors</a></li>
+<li><a href="developer/analyzers.html">Analyzers</a></li>
+<li><a href="developer/rule-engine.html">Rule engine</a></li>
+<li><a href="developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="output-formats-exit-codes">Output formats &amp; exit codes<a class="anchor" href="#output-formats-exit-codes">#</a></h1>
+<h2 id="formats">Formats<a class="anchor" href="#formats">#</a></h2>
+<p>Choose with <code>--format</code> (or <code>output.format</code> in config). Write to a file with <code>--output &lt;path&gt;</code>; otherwise output goes to stdout.</p>
+<table><thead><tr><th>Format</th><th>Flag</th><th>Description</th></tr></thead><tbody><tr><td>Terminal</td><td><code>--format terminal</code> (default)</td><td>Rich, color-coded by severity, with summary, keyspace tables, and findings.</td></tr><tr><td>JSON</td><td><code>--format json</code></td><td>The full <code>Report</code> model. Stable schema — this is the automation contract.</td></tr><tr><td>Markdown</td><td><code>--format markdown</code></td><td>Summary, server info, findings with evidence/checks/fixes, raw stats appendix.</td></tr><tr><td>PDF</td><td>via <code>serve</code> <code>/api/export/{id}.pdf</code></td><td>Rendered from markdown with WeasyPrint.</td></tr></tbody></table>
+<p>The <code>report</code> command re-renders a saved JSON report in any other format, and <code>diff</code> compares two JSON reports. See <a href="commands/index.html">Commands</a>.</p>
+<h3 id="json-shape">JSON shape<a class="anchor" href="#json-shape">#</a></h3>
+<pre><code class="language-json">{
+  &quot;target&quot;: &quot;redis://localhost:6379/0&quot;,
+  &quot;generated_at&quot;: &quot;2026-06-16T15:42:10+02:00&quot;,
+  &quot;redis_doctor_version&quot;: &quot;1.0.0&quot;,
+  &quot;health_score&quot;: 72,
+  &quot;category_scores&quot;: { &quot;memory&quot;: 60, &quot;clients&quot;: 80, &quot;streams&quot;: 40 },
+  &quot;summary&quot;: { &quot;critical&quot;: 2, &quot;warning&quot;: 7, &quot;info&quot;: 11 },
+  &quot;server&quot;: { &quot;redis_version&quot;: &quot;7.2.4&quot;, &quot;role&quot;: &quot;master&quot;,
+              &quot;used_memory_bytes&quot;: 9341553868, &quot;maxmemory_bytes&quot;: 10737418240 },
+  &quot;findings&quot;: [
+    {
+      &quot;id&quot;: &quot;memory.high_usage_noeviction&quot;,
+      &quot;severity&quot;: &quot;critical&quot;,
+      &quot;category&quot;: &quot;memory&quot;,
+      &quot;title&quot;: &quot;Redis memory usage is high with noeviction policy&quot;,
+      &quot;evidence&quot;: { &quot;used_memory_pct&quot;: 91.2, &quot;maxmemory_policy&quot;: &quot;noeviction&quot; },
+      &quot;suggested_checks&quot;: [&quot;redis-cli INFO memory&quot;],
+      &quot;suggested_fixes&quot;: [&quot;Increase maxmemory&quot;, &quot;Add TTLs&quot;, &quot;Use a suitable eviction policy&quot;]
+    }
+  ],
+  &quot;skipped&quot;: [],
+  &quot;stats&quot;: { }
+}</code></pre>
+<p>Every finding carries: <code>id</code>, <code>severity</code>, <code>category</code>, <code>confidence</code>, <code>title</code>, <code>explanation</code>, <code>evidence</code>, <code>suggested_checks</code>, <code>suggested_fixes</code>, and <code>affected</code>. See the <a href="findings-catalog.html">Findings catalog</a>.</p>
+<h2 id="health-score">Health score<a class="anchor" href="#health-score">#</a></h2>
+<p>A secondary summary of the findings (the findings themselves are the product):</p>
+<pre><code class="language-text">start at 100
+each critical finding: -15
+each warning finding:  -5
+each info finding:      0
+clamp to [0, 100]</code></pre>
+<p>The same formula is applied per category to produce <code>category_scores</code>; a category with no findings scores 100.</p>
+<h2 id="exit-codes">Exit codes<a class="anchor" href="#exit-codes">#</a></h2>
+<pre><code class="language-text">0 = success; no findings at or above the --fail-on threshold
+1 = findings at/above the warning threshold were present
+2 = findings at/above the critical threshold were present
+3 = connection / authentication error
+4 = invalid config / invalid arguments
+5 = internal error</code></pre>
+<p><code>--fail-on</code> accepts <code>none</code> (default — always exit 0 on a successful run), <code>warning</code>, or <code>critical</code>. <code>--no-fail</code> forces exit 0 regardless of findings.</p>
+<table><thead><tr><th><code>--fail-on</code></th><th>criticals present</th><th>only warnings present</th><th>clean</th></tr></thead><tbody><tr><td><code>none</code></td><td>0</td><td>0</td><td>0</td></tr><tr><td><code>warning</code></td><td>2</td><td>1</td><td>0</td></tr><tr><td><code>critical</code></td><td>2</td><td>0</td><td>0</td></tr></tbody></table>
+<p>This is the contract CI relies on — see <a href="guides/ci.html">CI integration</a>.</p>
+<h2 id="skipped-modules">Skipped modules<a class="anchor" href="#skipped-modules">#</a></h2>
+<p>When a command is unavailable (ACL restriction, old version, missing module) the analyzer records a <em>skipped module</em> note and the run continues. These appear under <code>skipped</code> in JSON and a &quot;Skipped&quot; section in the terminal output, e.g.:</p>
+<pre><code class="language-text">Skipped:
+- config_values: user lacks permission for config_values
+- keyspace: MEMORY USAGE skipped for 14 keys: keys expired during scan</code></pre>
+<div class="pager">
+<a class="prev" href="findings-catalog.html">← Findings catalog</a>
+<a class="next" href="safety.html">Safety guardrails →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

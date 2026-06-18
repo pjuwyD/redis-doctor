@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Testing · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="collectors.html">Collectors</a></li>
+<li><a href="analyzers.html">Analyzers</a></li>
+<li><a href="rule-engine.html">Rule engine</a></li>
+<li><a href="adding-a-module.html">Adding a module</a></li>
+<li><a class="active" href="testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="testing">Testing<a class="anchor" href="#testing">#</a></h1>
+<pre><code class="language-bash">pip install -e &quot;.[dev,tui,gui]&quot;
+pytest -q
+ruff check redis_doctor tests
+ruff format --check redis_doctor tests</code></pre>
+<h2 id="layout">Layout<a class="anchor" href="#layout">#</a></h2>
+<ul><li><code>tests/unit/</code> — fast tests using <strong>fakeredis</strong> and synthetic data.</li><li><code>tests/integration/</code> — tests that need a real Redis (skipped gracefully when</li></ul>
+<p>none is reachable).</p>
+<ul><li><code>tests/conftest.py</code> — fixtures: <code>fake_redis</code>, <code>safe_fake</code> (a <code>SafeRedis</code> over</li></ul>
+<p>fakeredis), and <code>real_redis_url</code> (skips if <code>REDIS_DOCTOR_TEST_URL</code>, default <code>redis://redis:6379</code>, is unreachable).</p>
+<h2 id="how-analyzers-are-tested">How analyzers are tested<a class="anchor" href="#how-analyzers-are-tested">#</a></h2>
+<p>Build a <code>RunContext</code>, drop synthetic data into <code>ctx.collected</code>, call the analyzer, and assert on finding IDs and severities:</p>
+<pre><code class="language-python">def test_locks_without_ttl(safe_fake):
+    from redis_doctor.pipeline import RunContext
+    ctx = RunContext(redis=safe_fake, config=Config())
+    ctx.collected[&quot;keyspace&quot;] = _keyspace(
+        [KeyInfo(key=f&quot;lock:{i}&quot;, type=&quot;string&quot;, ttl_seconds=-1) for i in range(20)]
+    )
+    ids = {f.id: f for f in TTLAnalyzer().analyze(ctx)}
+    assert ids[&quot;ttl.locks_without_ttl&quot;].severity == Severity.CRITICAL</code></pre>
+<p>This mirrors the spec&#x27;s seeded-state approach: for each known-bad state, assert the exact finding IDs at the right severity, and that unrelated findings are absent.</p>
+<h2 id="what-the-suite-guarantees">What the suite guarantees<a class="anchor" href="#what-the-suite-guarantees">#</a></h2>
+<ul><li><strong>Finding-ID assertions</strong> for every analyzer.</li><li><strong>Safety</strong>: <code>KEYS</code>/<code>MONITOR</code> blocked, write commands blocked, <code>SafeRedis.pipe</code></li></ul>
+<p>guarded.</p>
+<ul><li><strong>Output contract</strong>: JSON validates against the <code>Report</code> model; exit codes match</li></ul>
+<p>the <a href="../output-and-exit-codes.html#exit-codes">contract</a> for each <code>--fail-on</code>; secrets never appear in any output.</p>
+<ul><li><strong>TUI</strong>: mounts headlessly (Textual pilot), panels render, key bindings work.</li><li><strong>GUI</strong>: API endpoints via FastAPI <code>TestClient</code>; PDF renders a real <code>%PDF</code>.</li></ul>
+<h2 id="coverage-gate">Coverage gate<a class="anchor" href="#coverage-gate">#</a></h2>
+<p>Core modules — <code>pipeline</code>, <code>scoring</code>, <code>rule_engine</code>, <code>connection</code>, <code>safety</code>, and every analyzer — are held at <strong>≥85%</strong>. Check it:</p>
+<pre><code class="language-bash">pytest -q --cov=redis_doctor --cov-report=term-missing</code></pre>
+<h2 id="verifying-against-a-real-redis">Verifying against a real Redis<a class="anchor" href="#verifying-against-a-real-redis">#</a></h2>
+<p>Seed a known-bad local instance and run the CLI to confirm behavior end-to-end:</p>
+<pre><code class="language-bash">redis-server --port 7799 --maxmemory 4mb --maxmemory-policy noeviction --save &#x27;&#x27; \
+  --daemonize yes --logfile /tmp/r.log
+redis-cli -p 7799 mset lock:1 1 lock:2 1            # locks without TTL
+redis-doctor analyze redis://localhost:7799
+redis-cli -p 7799 shutdown nosave</code></pre>
+<div class="pager">
+<a class="prev" href="adding-a-module.html">← Adding a module</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

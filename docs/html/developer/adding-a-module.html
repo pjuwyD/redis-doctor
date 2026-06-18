@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Adding a module · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="collectors.html">Collectors</a></li>
+<li><a href="analyzers.html">Analyzers</a></li>
+<li><a href="rule-engine.html">Rule engine</a></li>
+<li><a class="active" href="adding-a-module.html">Adding a module</a></li>
+<li><a href="testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="adding-a-module">Adding a module<a class="anchor" href="#adding-a-module">#</a></h1>
+<p>A worked example: add a module <code>pubsub</code> that flags a high number of Pub/Sub channels. The same five steps apply to any new detector.</p>
+<h2 id="1-optional-a-model">1. (Optional) a model<a class="anchor" href="#1-optional-a-model">#</a></h2>
+<p>If the data does not fit an existing model, add one under <code>models/</code>. For a simple count you can skip this and return a dict or a small dataclass.</p>
+<h2 id="2-a-collector">2. A collector<a class="anchor" href="#2-a-collector">#</a></h2>
+<p><code>redis_doctor/collectors/pubsub.py</code>:</p>
+<pre><code class="language-python">from .base import Collector
+
+class PubSubCollector(Collector):
+    name = &quot;pubsub&quot;
+
+    def collect(self, ctx) -&gt; dict:
+        channels = ctx.redis.execute(&quot;PUBSUB&quot;, &quot;CHANNELS&quot;) or []
+        return {&quot;channel_count&quot;: len(channels)}</code></pre>
+<p>First, make sure any command you use is allowed in <code>safety.py</code> — add it to <code>ALLOWED_COMMANDS</code> if it is genuinely read-only. See <a href="../safety.html">Safety</a>.</p>
+<h2 id="3-an-analyzer">3. An analyzer<a class="anchor" href="#3-an-analyzer">#</a></h2>
+<p><code>redis_doctor/analyzers/pubsub_rules.py</code>:</p>
+<pre><code class="language-python">from ..models.finding import Category, Finding, Severity
+from .base import Analyzer
+
+CHANNEL_WARNING = 1000
+
+class PubSubAnalyzer(Analyzer):
+    name = &quot;pubsub&quot;
+
+    def analyze(self, ctx) -&gt; list[Finding]:
+        data = ctx.collected.get(&quot;pubsub&quot;)
+        if data is None:
+            return []
+        if data[&quot;channel_count&quot;] &gt; CHANNEL_WARNING:
+            return [Finding(
+                id=&quot;pubsub.many_channels&quot;,
+                severity=Severity.WARNING,
+                category=Category.SERVER,   # or add a new Category
+                title=f&quot;{data[&#x27;channel_count&#x27;]} active Pub/Sub channels&quot;,
+                explanation=&quot;A very high channel count can indicate a leak.&quot;,
+                evidence={&quot;channel_count&quot;: data[&quot;channel_count&quot;]},
+                suggested_checks=[&quot;redis-cli PUBSUB CHANNELS&quot;],
+                suggested_fixes=[&quot;Audit subscribers for leaked channels&quot;],
+            )]
+        return []</code></pre>
+<p>If you introduce a brand-new category, add it to the <code>Category</code> enum in <code>models/finding.py</code>.</p>
+<h2 id="4-register-it">4. Register it<a class="anchor" href="#4-register-it">#</a></h2>
+<p>In <code>pipeline.py</code>, import both and add a <code>ModuleSpec</code> to <code>_registry()</code>:</p>
+<pre><code class="language-python">ModuleSpec(&quot;pubsub&quot;, PubSubCollector(), PubSubAnalyzer()),</code></pre>
+<p>If your analyzer reuses another module&#x27;s data (like the keyspace sample), pass <code>None</code> for the collector and add an entry to <code>_DEPENDENCIES</code>.</p>
+<h2 id="5-rule-pack-docs-tests">5. Rule pack + docs + tests<a class="anchor" href="#5-rule-pack-docs-tests">#</a></h2>
+<ul><li>Add <code>pubsub.many_channels: { enabled: true }</code> to <code>rules/default.yml</code>.</li><li>Document the ID in the <a href="../findings-catalog.html">findings catalog</a>.</li><li>Add a unit test (synthetic <code>ctx.collected</code>) asserting the ID and severity, and —</li></ul>
+<p>ideally — an integration check against a seeded real Redis. See <a href="testing.html">Testing</a>.</p>
+<h2 id="reinstall-after-adding-files">Reinstall after adding files<a class="anchor" href="#reinstall-after-adding-files">#</a></h2>
+<p>The editable install caches the module list, so after adding new files run:</p>
+<pre><code class="language-bash">pip install -e &quot;.[dev]&quot;</code></pre>
+<p>Then <code>pytest -q</code> and <code>ruff check redis_doctor tests</code>.</p>
+<div class="pager">
+<a class="prev" href="rule-engine.html">← Rule engine</a>
+<a class="next" href="testing.html">Testing →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

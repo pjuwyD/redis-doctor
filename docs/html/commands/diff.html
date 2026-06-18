@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>diff · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="index.html">Commands</a></li>
+<li><a href="analyze.html">analyze</a></li>
+<li><a href="scan-keys.html">scan-keys</a></li>
+<li><a href="inspect-stream.html">inspect-stream</a></li>
+<li><a href="inspect-clients.html">inspect-clients</a></li>
+<li><a href="config-check.html">config-check</a></li>
+<li><a href="analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="report.html">report</a></li>
+<li><a class="active" href="diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="diff">diff<a class="anchor" href="#diff">#</a></h1>
+<p>Compare two saved JSON reports and show what changed. Does not connect to Redis.</p>
+<pre><code class="language-bash">redis-doctor diff &lt;before.json&gt; &lt;after.json&gt; [--format terminal|json] [--output &lt;path&gt;]</code></pre>
+<h2 id="what-it-computes">What it computes<a class="anchor" href="#what-it-computes">#</a></h2>
+<ul><li>Findings <strong>added</strong>, <strong>removed</strong>, and <strong>unchanged</strong>, matched by finding <code>id</code> plus</li></ul>
+<p>the primary <code>affected</code> key.</p>
+<ul><li>Health-score delta and per-category deltas.</li><li>Key metric deltas: used memory, total keys, per-prefix key counts, per-stream</li></ul>
+<p>length, and idle client count.</p>
+<h2 id="example">Example<a class="anchor" href="#example">#</a></h2>
+<pre><code class="language-bash">redis-doctor diff before.json after.json</code></pre>
+<pre><code class="language-text">Since previous report:
+- health score 85 -&gt; 60 (-25)
+- memory changed by +38% (+1240000 bytes)
+- total keys changed by +84000
+- idle clients 44 -&gt; 426
+- stream live:Inform.stream grew by +122000 entries
+- 2 new finding(s): clients.idle_many, streams.pending_high
+- 1 resolved finding(s): server.recent_restart</code></pre>
+<p><code>--format json</code> emits the structured <code>Diff</code> object (added/removed/unchanged lists, score and metric deltas) for automation. The same computation backs the web dashboard&#x27;s Diff view — see <a href="../guides/gui.html">the GUI guide</a>.</p>
+<div class="pager">
+<a class="prev" href="report.html">← report</a>
+<a class="next" href="../configuration.html">Configuration →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

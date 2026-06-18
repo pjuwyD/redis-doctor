@@ -27,7 +27,6 @@ htmlcov/
 .nox/
 
 # ── Generated documentation (rebuild: docs/tools/converter.py) ──
-docs/html/
 
 # ── redis-doctor runtime / local artifacts ───────────────
 *.pdf

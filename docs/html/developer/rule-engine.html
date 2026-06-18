@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rule engine · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="collectors.html">Collectors</a></li>
+<li><a href="analyzers.html">Analyzers</a></li>
+<li><a class="active" href="rule-engine.html">Rule engine</a></li>
+<li><a href="adding-a-module.html">Adding a module</a></li>
+<li><a href="testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="rule-engine">Rule engine<a class="anchor" href="#rule-engine">#</a></h1>
+<p><code>rule_engine.py</code> decouples detection logic from policy. Analyzers ask it for thresholds and the pipeline asks it whether a finding may be emitted.</p>
+<h2 id="the-rule-pack">The rule pack<a class="anchor" href="#the-rule-pack">#</a></h2>
+<p><code>rules/default.yml</code> lists <strong>every</strong> finding ID with its default <code>enabled</code> state and optional default thresholds:</p>
+<pre><code class="language-yaml">rules:
+  memory.high_usage: { enabled: true, warning_pct: 80, critical_pct: 90 }
+  server.recent_restart: { enabled: true }
+  ...</code></pre>
+<p>The pack is bundled into the wheel (and the PyInstaller binary) at <code>redis_doctor/rules/default.yml</code>; the engine also finds it in the source tree during development.</p>
+<h2 id="resolution">Resolution<a class="anchor" href="#resolution">#</a></h2>
+<p><code>RuleEngine.from_config(config)</code> merges, per rule ID:</p>
+<pre><code class="language-text">default.yml  &lt;  config &quot;rules:&quot; overrides</code></pre>
+<p>and records <code>config.ignore.rules</code>. It exposes:</p>
+<ul><li><code>get(rule_id) -&gt; RuleConfig</code> — <code>.enabled</code> plus a <code>params</code> dict</li></ul>
+<p>(<code>rule.get(&quot;warning_pct&quot;, default)</code>).</p>
+<ul><li><code>is_active(rule_id) -&gt; bool</code> — <code>enabled</code> <strong>and</strong> not in <code>ignore.rules</code>.</li></ul>
+<h2 id="how-emission-is-gated">How emission is gated<a class="anchor" href="#how-emission-is-gated">#</a></h2>
+<p>The pipeline filters every analyzer&#x27;s output:</p>
+<pre><code class="language-python">findings = [f for f in findings if engine.is_active(f.id)]</code></pre>
+<p>So an analyzer always emits; the engine decides what survives. Disabling a rule (<code>rules.&lt;id&gt;.enabled: false</code>) and ignoring it (<code>ignore.rules: [&lt;id&gt;]</code>) both remove it — see <a href="../configuration.html#rules-enable-disable-override">Configuration</a>.</p>
+<h2 id="per-rule-threshold-overrides">Per-rule threshold overrides<a class="anchor" href="#per-rule-threshold-overrides">#</a></h2>
+<p>An analyzer that wants a per-rule override reads it from the engine, falling back to the global threshold:</p>
+<pre><code class="language-python">rule = ctx.rules.get(&quot;memory.high_usage&quot;)
+warning_pct = rule.get(&quot;warning_pct&quot;, ctx.config.thresholds.memory_warning_pct)</code></pre>
+<p>Today <code>memory.high_usage</code> demonstrates this; most analyzers use the global <code>thresholds:</code> block, which is sufficient for the majority of tuning. Wiring more per-rule overrides is a safe, mechanical change if you need them.</p>
+<h2 id="adding-a-new-rule">Adding a new rule<a class="anchor" href="#adding-a-new-rule">#</a></h2>
+<ol><li>Emit the finding from an analyzer with a new <code>category.name</code> ID.</li><li>Add the ID to <code>rules/default.yml</code> with <code>{ enabled: true }</code> (and any default</li></ol>
+<p>threshold params).</p>
+<ol><li>Document it in the <a href="../findings-catalog.html">findings catalog</a>.</li><li>Add a test asserting the ID and severity.</li></ol>
+<div class="pager">
+<a class="prev" href="analyzers.html">← Analyzers</a>
+<a class="next" href="adding-a-module.html">Adding a module →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

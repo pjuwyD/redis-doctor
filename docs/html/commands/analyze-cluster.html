@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>analyze-cluster · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="index.html">Commands</a></li>
+<li><a href="analyze.html">analyze</a></li>
+<li><a href="scan-keys.html">scan-keys</a></li>
+<li><a href="inspect-stream.html">inspect-stream</a></li>
+<li><a href="inspect-clients.html">inspect-clients</a></li>
+<li><a href="config-check.html">config-check</a></li>
+<li><a href="analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a class="active" href="analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="report.html">report</a></li>
+<li><a href="diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="analyze-cluster">analyze-cluster<a class="anchor" href="#analyze-cluster">#</a></h1>
+<p>Redis Cluster diagnostic, using read-only <code>CLUSTER</code> subcommands.</p>
+<pre><code class="language-bash">redis-doctor analyze-cluster &lt;redis-url&gt; [options]</code></pre>
+<h2 id="what-it-does">What it does<a class="anchor" href="#what-it-does">#</a></h2>
+<p>Detects whether the instance is in cluster mode. If it is not, it prints a notice and exits <code>0</code>. If it is, it reports slot coverage and a per-node summary (role, slots, keys, memory, clients) and emits the cluster findings: <code>cluster.uncovered_slots</code>, <code>cluster.failed_node</code>, <code>cluster.master_without_replica</code>, <code>cluster.uneven_keys</code>, <code>cluster.uneven_memory</code> (see the <a href="../findings-catalog.html#cluster">catalog</a>).</p>
+<p>Per-node memory/keys are gathered by connecting to each master node and reading <code>INFO</code>/<code>DBSIZE</code>; unreachable nodes are marked and skipped.</p>
+<h2 id="flags">Flags<a class="anchor" href="#flags">#</a></h2>
+<pre><code class="language-text">--host --port --password --tls
+--socket-timeout --connect-timeout
+--format terminal|markdown|json   --output &lt;path&gt;
+--fail-on none|warning|critical   --no-fail
+--config &lt;file&gt;</code></pre>
+<h2 id="example">Example<a class="anchor" href="#example">#</a></h2>
+<pre><code class="language-bash">redis-doctor analyze-cluster redis://localhost:7000</code></pre>
+<pre><code class="language-text">Cluster state: ok; slots 16384/16384 assigned (0 uncovered); 6 nodes, size 3
+
+                         Cluster nodes
+┃ Node            ┃ Role   ┃ Slots ┃ Keys   ┃ Memory  ┃ Clients ┃
+│ 10.0.0.1:7000   │ master │  5461 │ 120000 │ 220 MB  │   42    │
+│ 10.0.0.2:7001   │ master │  5461 │ 118500 │ 215 MB  │   39    │
+│ 10.0.0.3:7002   │ master │  5462 │  60000 │ 110 MB  │   18    │
+
+Warnings:
+  [CLUSTER] cluster.uneven_keys — Uneven key distribution across masters</code></pre>
+<p>Against a non-cluster instance:</p>
+<pre><code class="language-text">This instance is not running in cluster mode.</code></pre>
+<div class="pager">
+<a class="prev" href="analyze-sentinel.html">← analyze-sentinel</a>
+<a class="next" href="report.html">report →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

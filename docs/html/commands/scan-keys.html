@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scan-keys · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="index.html">Commands</a></li>
+<li><a href="analyze.html">analyze</a></li>
+<li><a class="active" href="scan-keys.html">scan-keys</a></li>
+<li><a href="inspect-stream.html">inspect-stream</a></li>
+<li><a href="inspect-clients.html">inspect-clients</a></li>
+<li><a href="config-check.html">config-check</a></li>
+<li><a href="analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="report.html">report</a></li>
+<li><a href="diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="scan-keys">scan-keys<a class="anchor" href="#scan-keys">#</a></h1>
+<p>Keyspace and prefix report only — no other analyzers run.</p>
+<pre><code class="language-bash">redis-doctor scan-keys &lt;redis-url&gt; [options]</code></pre>
+<h2 id="what-it-does">What it does<a class="anchor" href="#what-it-does">#</a></h2>
+<p>Runs the <a href="../developer/collectors.html#keyspace-sampler">keyspace sampler</a> (via <code>SCAN</code>, never <code>KEYS</code>) and prints:</p>
+<ul><li>sampling metadata (scanned vs. estimated total, confidence, duration);</li><li>top prefixes by key count;</li><li>top prefixes by estimated memory;</li><li>the value-type distribution.</li></ul>
+<p>It always exits <code>0</code> on a successful run (it is informational).</p>
+<h2 id="flags">Flags<a class="anchor" href="#flags">#</a></h2>
+<p><a href="index.html#connection-flags">Connection flags</a> plus the sampling flags:</p>
+<pre><code class="language-text">--format terminal|markdown|json    --output &lt;path&gt;
+--sample-size --scan-count --max-scan-seconds
+--prefix-depth --prefix-separators</code></pre>
+<h2 id="prefix-tokenization">Prefix tokenization<a class="anchor" href="#prefix-tokenization">#</a></h2>
+<p>Keys are grouped by their first <code>--prefix-depth</code> tokens, split on <code>--prefix-separators</code> (default <code>:.|/_</code>). For <code>session:user:123</code> and <code>queue:email:pending</code>:</p>
+<ul><li>depth 1 → <code>session</code>, <code>queue</code></li><li>depth 2 → <code>session:user</code>, <code>queue:email</code></li></ul>
+<h2 id="example">Example<a class="anchor" href="#example">#</a></h2>
+<pre><code class="language-bash">redis-doctor scan-keys redis://localhost:6379 --prefix-depth 1</code></pre>
+<pre><code class="language-text">Key analysis based on sample:
+- scanned 820 keys from estimated 820 total keys
+- confidence: high
+
+        Top prefixes by count
+┃  # ┃ Prefix         ┃ Keys ┃ Share ┃
+│  1 │ session:user:* │  120 │   15% │
+Type distribution: string 100%</code></pre>
+<p>See also <a href="analyze.html"><code>analyze</code></a>, which includes this section plus all other modules.</p>
+<div class="pager">
+<a class="prev" href="analyze.html">← analyze</a>
+<a class="next" href="inspect-stream.html">inspect-stream →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

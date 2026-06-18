@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Terminal UI · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="explore.html">Explore</a></li>
+<li><a class="active" href="tui.html">Terminal UI</a></li>
+<li><a href="gui.html">Web dashboard</a></li>
+<li><a href="ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="terminal-ui">Terminal UI<a class="anchor" href="#terminal-ui">#</a></h1>
+<p>An interactive terminal dashboard built with <a href="https://textual.textualize.io/">Textual</a>. Requires the <code>tui</code> extra:</p>
+<pre><code class="language-bash">pip install &#x27;redis-doctor[tui]&#x27;
+redis-doctor tui redis://localhost:6379</code></pre>
+<p>It runs the same pipeline as <a href="../commands/analyze.html"><code>analyze</code></a>, holds a single <code>Report</code>, and lets you browse it interactively. Every panel renders a slice of the one report — nothing is recomputed as you switch panels.</p>
+<h2 id="layout">Layout<a class="anchor" href="#layout">#</a></h2>
+<p>A left sidebar of panels and a main content area:</p>
+<pre><code class="language-text">Health     - score, severity counts, top findings
+Memory     - used vs maxmemory, fragmentation, policy, memory findings
+Keys       - prefix table, type distribution, sampling metadata, key findings
+Streams    - stream list with groups/consumers/pending
+Clients    - client groupings (idle/blocked/unnamed/by-command)
+Slowlog    - slowlog metrics + slowlog findings
+Config     - config + persistence risk findings
+Replication- role + replica topology
+Sentinel   - Sentinel topology (when connected via Sentinel)</code></pre>
+<h2 id="key-bindings">Key bindings<a class="anchor" href="#key-bindings">#</a></h2>
+<table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td>arrows / mouse</td><td>switch panels via the sidebar</td></tr><tr><td><code>e</code></td><td>expand the selected view&#x27;s findings to show evidence, checks, and fixes</td></tr><tr><td><code>f</code></td><td>cycle the severity filter: all → critical → warning</td></tr><tr><td><code>r</code></td><td>re-run the full analysis and refresh every panel</td></tr><tr><td><code>s</code></td><td>save the current report to JSON (prompts for a path)</td></tr><tr><td><code>q</code></td><td>quit</td></tr></tbody></table>
+<p>The analysis runs in a background worker so the UI stays responsive, and a render error in one panel never tears down the app.</p>
+<div class="pager">
+<a class="prev" href="explore.html">← Explore</a>
+<a class="next" href="gui.html">Web dashboard →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

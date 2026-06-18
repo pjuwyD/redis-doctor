@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Configuration · Redis Doctor docs</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="getting-started.html">Getting started</a></li>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="commands/index.html">Commands</a></li>
+<li><a href="commands/analyze.html">analyze</a></li>
+<li><a href="commands/scan-keys.html">scan-keys</a></li>
+<li><a href="commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="commands/config-check.html">config-check</a></li>
+<li><a href="commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="commands/report.html">report</a></li>
+<li><a href="commands/diff.html">diff</a></li>
+<li><a class="active" href="configuration.html">Configuration</a></li>
+<li><a href="findings-catalog.html">Findings catalog</a></li>
+<li><a href="output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="guides/explore.html">Explore</a></li>
+<li><a href="guides/tui.html">Terminal UI</a></li>
+<li><a href="guides/gui.html">Web dashboard</a></li>
+<li><a href="guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="developer/architecture.html">Architecture</a></li>
+<li><a href="developer/collectors.html">Collectors</a></li>
+<li><a href="developer/analyzers.html">Analyzers</a></li>
+<li><a href="developer/rule-engine.html">Rule engine</a></li>
+<li><a href="developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="configuration">Configuration<a class="anchor" href="#configuration">#</a></h1>
+<p>Redis Doctor reads settings from, in increasing order of precedence:</p>
+<ol><li><strong>Built-in defaults</strong></li><li><strong>A config file</strong> (<code>--config redis-doctor.yml</code> or <code>REDIS_DOCTOR_CONFIG</code>)</li><li><strong>Environment variables</strong></li><li><strong>CLI flags</strong></li></ol>
+<p>A flag always wins over the file; the file always wins over the defaults.</p>
+<h2 id="environment-variables">Environment variables<a class="anchor" href="#environment-variables">#</a></h2>
+<table><thead><tr><th>Variable</th><th>Purpose</th></tr></thead><tbody><tr><td><code>REDIS_DOCTOR_PASSWORD</code></td><td>password used if <code>--password</code> is not given</td></tr><tr><td><code>REDIS_DOCTOR_USERNAME</code></td><td>username used if <code>--username</code> is not given</td></tr><tr><td><code>REDIS_DOCTOR_CONFIG</code></td><td>path to a config file if <code>--config</code> is not given</td></tr></tbody></table>
+<p>SMTP settings for the email notifier are also read from the environment: <code>REDIS_DOCTOR_SMTP_HOST</code>, <code>REDIS_DOCTOR_SMTP_PORT</code>, <code>REDIS_DOCTOR_SMTP_FROM</code>.</p>
+<h2 id="full-config-file-schema">Full config file schema<a class="anchor" href="#full-config-file-schema">#</a></h2>
+<pre><code class="language-yaml">connection:
+  timeout_seconds: 5
+
+scan:
+  sample_size: 10000        # max keys to sample
+  count: 1000               # COUNT hint per SCAN iteration
+  max_seconds: 30           # hard cap on total scan time
+  prefix_depth: 2           # tokens kept when grouping prefixes
+  prefix_separators: &quot;:.|/_&quot; # characters that split a key into tokens
+
+thresholds:
+  memory_warning_pct: 80
+  memory_critical_pct: 90
+  fragmentation_warning_ratio: 1.5
+  idle_client_warning_seconds: 3600
+  idle_client_warning_count: 100
+  idle_client_critical_count: 500
+  blocked_client_warning: 1
+  big_key_mb: 10
+  huge_key_mb: 100
+  large_collection: 10000
+  huge_collection: 100000
+  stream_length_warning: 100000
+  stream_pending_warning: 10000
+  consumer_idle_warning_seconds: 3600
+  slowlog_max_entries: 128
+  replica_lag_warning_seconds: 30
+  replica_lag_critical_seconds: 120
+
+ttl_expectations:
+  - pattern: &quot;session:*&quot;
+    ttl_required: true
+    max_ttl_seconds: 86400
+  - pattern: &quot;lock:*&quot;
+    ttl_required: true
+    max_ttl_seconds: 300
+  - pattern: &quot;cache:*&quot;
+    ttl_required: true
+
+rules:                      # per-rule overrides / disabling
+  memory.high_usage:
+    enabled: true
+    warning_pct: 80
+    critical_pct: 90
+  clients.idle_many:
+    enabled: true
+    idle_seconds: 3600
+    warning_count: 100
+    critical_count: 500
+
+ignore:
+  keys:
+    - &quot;metrics:*&quot;           # excluded from sampling/analysis
+  rules:
+    - &quot;security.default_user&quot;  # this finding is never emitted
+
+output:
+  format: terminal          # terminal | markdown | json
+  fail_on: none             # none | warning | critical
+
+notify:
+  slack_webhook_url: null
+  email: null
+
+history:
+  enabled: false
+  path: &quot;~/.redis-doctor/history.db&quot;</code></pre>
+<p>A ready-to-edit copy ships as <code>redis-doctor.example.yml</code>.</p>
+<h2 id="scan-sampling">Scan / sampling<a class="anchor" href="#scan-sampling">#</a></h2>
+<p>The keyspace is <strong>never fully scanned by default</strong>. Sampling stops as soon as any limit is hit (<code>sample_size</code> reached or <code>max_seconds</code> elapsed). The report always states how many keys were scanned, the estimated total, and a confidence level. See the <a href="developer/collectors.html#keyspace-sampler">keyspace sampler internals</a>.</p>
+<p>These can also be set per-run as flags on <code>analyze</code> and <code>scan-keys</code>: <code>--sample-size</code>, <code>--scan-count</code>, <code>--max-scan-seconds</code>, <code>--prefix-depth</code>, <code>--prefix-separators</code>.</p>
+<h2 id="thresholds">Thresholds<a class="anchor" href="#thresholds">#</a></h2>
+<p>Every analyzer reads its thresholds from configuration rather than hardcoding them. The <code>thresholds:</code> block sets global defaults; a <code>rules:</code> entry can override specific values for one finding ID (see below).</p>
+<h2 id="ttl-expectations">TTL expectations<a class="anchor" href="#ttl-expectations">#</a></h2>
+<p><code>ttl_expectations</code> lets you encode your conventions. A pattern with <code>ttl_required: true</code> whose matching keys lack a TTL produces a finding; a <code>max_ttl_seconds</code> that is exceeded produces <code>ttl.excessive_ttl</code>. Patterns use glob syntax (<code>session:*</code>).</p>
+<h2 id="rules-enable-disable-override">Rules: enable, disable, override<a class="anchor" href="#rules-enable-disable-override">#</a></h2>
+<p>The shipped rule pack (<code>rules/default.yml</code>) lists every finding ID with its default <code>enabled</code> state and thresholds. Your <code>rules:</code> block overrides any field per rule ID. To turn a rule off:</p>
+<pre><code class="language-yaml">rules:
+  server.recent_restart:
+    enabled: false</code></pre>
+<p>To raise a threshold for one rule only:</p>
+<pre><code class="language-yaml">rules:
+  memory.high_usage:
+    warning_pct: 70
+    critical_pct: 85</code></pre>
+<p>A finding is emitted only if its rule is enabled <strong>and</strong> its ID is not in <code>ignore.rules</code>. See the <a href="developer/rule-engine.html">rule engine</a>.</p>
+<h2 id="ignore">Ignore<a class="anchor" href="#ignore">#</a></h2>
+<pre><code class="language-yaml">ignore:
+  keys:                     # glob patterns excluded from the keyspace sample
+    - &quot;metrics:*&quot;
+  rules:                    # finding IDs that are never emitted
+    - &quot;security.default_user&quot;</code></pre>
+<h2 id="output-and-ci">Output and CI<a class="anchor" href="#output-and-ci">#</a></h2>
+<p><code>output.format</code> sets the default rendering and <code>output.fail_on</code> the default CI-gate behavior; both are overridden by <code>--format</code> and <code>--fail-on</code>. See <a href="output-and-exit-codes.html">Output &amp; exit codes</a>.</p>
+<div class="pager">
+<a class="prev" href="commands/diff.html">← diff</a>
+<a class="next" href="findings-catalog.html">Findings catalog →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

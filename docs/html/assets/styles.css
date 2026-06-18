@@ -1,0 +1,53 @@
+
+:root { --fg:#1f2330; --muted:#5b6472; --bg:#fdfdfd; --side:#1b1b2b;
+        --side-fg:#cfd3e0; --accent:#2f6fed; --crit:#d12b2b; --warn:#c47f00;
+        --code-bg:#f4f5f8; --border:#e3e6ec; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+       color: var(--fg); background: var(--bg); line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.layout { display: flex; min-height: 100vh; }
+nav.side { width: 270px; background: var(--side); color: var(--side-fg);
+           padding: 1.2rem 1rem; flex-shrink: 0; overflow-y: auto;
+           position: sticky; top: 0; height: 100vh; }
+nav.side .brand { color:#fff; font-weight:700; font-size:1.15rem; margin-bottom:.2rem; }
+nav.side .tag { color:#8b90a6; font-size:.8rem; margin-bottom:1rem; display:block; }
+nav.side .sect { color:#8b90a6; text-transform:uppercase; font-size:.72rem;
+                 letter-spacing:.08em; margin:1rem 0 .35rem; }
+nav.side ul { list-style:none; margin:0; padding:0; }
+nav.side li { margin:.1rem 0; }
+nav.side a { color: var(--side-fg); display:block; padding:.2rem .5rem; border-radius:5px;
+             font-size:.92rem; }
+nav.side a:hover { background:#2a2a40; text-decoration:none; }
+nav.side a.active { background: var(--accent); color:#fff; }
+main { flex:1; min-width:0; }
+article { max-width: 860px; margin:0 auto; padding: 2rem 2.4rem 4rem; }
+h1,h2,h3,h4 { line-height:1.25; }
+h1 { font-size:2rem; margin:.2rem 0 1rem; }
+h2 { font-size:1.4rem; margin-top:2rem; border-bottom:1px solid var(--border);
+     padding-bottom:.3rem; }
+h3 { font-size:1.12rem; margin-top:1.5rem; }
+h4 { font-size:1rem; margin-top:1.2rem; color: var(--muted); }
+.anchor { color: var(--border); margin-left:.4rem; font-weight:400; opacity:0; }
+h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity:1; }
+code { background: var(--code-bg); padding:.1rem .35rem; border-radius:4px;
+       font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size:.88em; }
+pre { background: var(--code-bg); border:1px solid var(--border); border-radius:8px;
+      padding:1rem; overflow:auto; }
+pre code { background:none; padding:0; font-size:.85rem; line-height:1.45; }
+table { border-collapse: collapse; width:100%; margin:1rem 0; font-size:.92rem; }
+th, td { border:1px solid var(--border); padding:.45rem .6rem; text-align:left;
+         vertical-align:top; }
+th { background: var(--code-bg); }
+blockquote { margin:1rem 0; padding:.4rem 1rem; border-left:4px solid var(--accent);
+             background: var(--code-bg); color: var(--muted); }
+hr { border:none; border-top:1px solid var(--border); margin:2rem 0; }
+.pager { display:flex; justify-content:space-between; margin-top:3rem;
+         border-top:1px solid var(--border); padding-top:1rem; font-size:.92rem; }
+.pager .next { margin-left:auto; text-align:right; }
+footer { color: var(--muted); font-size:.8rem; margin-top:2rem; }
+@media (max-width: 800px) {
+  .layout { flex-direction: column; }
+  nav.side { width:100%; height:auto; position:static; }
+}

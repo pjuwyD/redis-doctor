@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>analyze-sentinel · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="index.html">Commands</a></li>
+<li><a href="analyze.html">analyze</a></li>
+<li><a href="scan-keys.html">scan-keys</a></li>
+<li><a href="inspect-stream.html">inspect-stream</a></li>
+<li><a href="inspect-clients.html">inspect-clients</a></li>
+<li><a href="config-check.html">config-check</a></li>
+<li><a class="active" href="analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="report.html">report</a></li>
+<li><a href="diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="analyze-sentinel">analyze-sentinel<a class="anchor" href="#analyze-sentinel">#</a></h1>
+<p>Sentinel topology diagnostic. Connects to one or more Sentinel nodes using read-only <code>SENTINEL</code> subcommands.</p>
+<pre><code class="language-bash">redis-doctor analyze-sentinel \
+  --sentinel-node host:port [--sentinel-node host:port ...] \
+  --master-name &lt;name&gt; [options]</code></pre>
+<h2 id="flags">Flags<a class="anchor" href="#flags">#</a></h2>
+<pre><code class="language-text">--sentinel-node host:port    (repeatable, required)
+--master-name &lt;name&gt;         (required)
+--password &lt;redis-password&gt;
+--sentinel-password &lt;sentinel-password&gt;
+--format terminal|markdown|json   --output &lt;path&gt;
+--fail-on none|warning|critical   --no-fail
+--config &lt;file&gt;</code></pre>
+<h2 id="what-it-checks">What it checks<a class="anchor" href="#what-it-checks">#</a></h2>
+<p>Monitored masters, current master address, sentinel count vs. quorum, failover-timeout, down-after-milliseconds, replica flags and lag. Findings: <code>sentinel.insufficient_quorum</code>, <code>sentinel.replica_lag_high</code>, <code>sentinel.master_disagreement</code>, <code>sentinel.unreachable_replica</code>, <code>sentinel.failover_timeout_unusual</code> (see the <a href="../findings-catalog.html#sentinel">catalog</a>).</p>
+<h2 id="example">Example<a class="anchor" href="#example">#</a></h2>
+<pre><code class="language-bash">redis-doctor analyze-sentinel --sentinel-node 127.0.0.1:26379 --master-name mymaster</code></pre>
+<pre><code class="language-text">Critical findings:
+  [SENTINEL] sentinel.insufficient_quorum — Only 1 Sentinel(s) reachable, but quorum is 2
+    Evidence: reachable_sentinels=1, quorum=2
+Warnings:
+  [SENTINEL] sentinel.failover_timeout_unusual — failover-timeout is unusually high: 180000 ms</code></pre>
+<div class="pager">
+<a class="prev" href="config-check.html">← config-check</a>
+<a class="next" href="analyze-cluster.html">analyze-cluster →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

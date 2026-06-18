@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Getting started · Redis Doctor docs</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a class="active" href="getting-started.html">Getting started</a></li>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="commands/index.html">Commands</a></li>
+<li><a href="commands/analyze.html">analyze</a></li>
+<li><a href="commands/scan-keys.html">scan-keys</a></li>
+<li><a href="commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="commands/config-check.html">config-check</a></li>
+<li><a href="commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="commands/report.html">report</a></li>
+<li><a href="commands/diff.html">diff</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="findings-catalog.html">Findings catalog</a></li>
+<li><a href="output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="guides/explore.html">Explore</a></li>
+<li><a href="guides/tui.html">Terminal UI</a></li>
+<li><a href="guides/gui.html">Web dashboard</a></li>
+<li><a href="guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="developer/architecture.html">Architecture</a></li>
+<li><a href="developer/collectors.html">Collectors</a></li>
+<li><a href="developer/analyzers.html">Analyzers</a></li>
+<li><a href="developer/rule-engine.html">Rule engine</a></li>
+<li><a href="developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="getting-started">Getting started<a class="anchor" href="#getting-started">#</a></h1>
+<p>This page takes you from zero to a first health report in a few minutes.</p>
+<h2 id="1-install">1. Install<a class="anchor" href="#1-install">#</a></h2>
+<p>The fastest way is <a href="https://pipx.pypa.io/">pipx</a> so the CLI lands on your PATH in an isolated environment:</p>
+<pre><code class="language-bash">pipx install redis-doctor</code></pre>
+<p>Or plain pip:</p>
+<pre><code class="language-bash">pip install redis-doctor</code></pre>
+<p>For the interactive terminal UI or the web dashboard, install the matching extra:</p>
+<pre><code class="language-bash">pip install &#x27;redis-doctor[tui]&#x27;   # Textual TUI
+pip install &#x27;redis-doctor[gui]&#x27;   # FastAPI dashboard + PDF export</code></pre>
+<p>See <a href="installation.html">Installation</a> for Docker, the standalone binary, and the system libraries WeasyPrint needs for PDF export.</p>
+<h2 id="2-run-your-first-diagnosis">2. Run your first diagnosis<a class="anchor" href="#2-run-your-first-diagnosis">#</a></h2>
+<p>Point <code>analyze</code> at any Redis URL:</p>
+<pre><code class="language-bash">redis-doctor analyze redis://localhost:6379</code></pre>
+<p>You will get a health score, a server summary, a sampled keyspace overview, and a list of findings grouped by severity. Each finding explains what is wrong, why it matters, and how to check and fix it. See the full walk-through in <a href="examples.html">Examples</a>.</p>
+<p>Supported connection targets:</p>
+<pre><code class="language-bash">redis-doctor analyze redis://localhost:6379
+redis-doctor analyze rediss://redis.example.com:6379          # TLS
+redis-doctor analyze redis://:password@localhost:6379/0       # legacy AUTH
+redis-doctor analyze redis://user:password@localhost:6379/0   # ACL
+redis-doctor analyze unix:///var/run/redis/redis.sock</code></pre>
+<p>The password is <strong>never</strong> printed and is redacted everywhere it could appear (logs, the rendered target, reports). See <a href="safety.html">Safety</a>.</p>
+<h2 id="3-make-it-a-ci-gate">3. Make it a CI gate<a class="anchor" href="#3-make-it-a-ci-gate">#</a></h2>
+<p><code>analyze</code> returns a meaningful exit code so you can fail a pipeline on problems:</p>
+<pre><code class="language-bash">redis-doctor analyze &quot;$REDIS_URL&quot; --fail-on critical</code></pre>
+<ul><li>exit <code>0</code> — healthy (no findings at/above the threshold)</li><li>exit <code>2</code> — at least one critical finding</li></ul>
+<p>Full table in <a href="output-and-exit-codes.html">Output &amp; exit codes</a>, copy-paste CI snippets in <a href="guides/ci.html">CI integration</a>.</p>
+<h2 id="4-tune-it-for-your-workload">4. Tune it for your workload<a class="anchor" href="#4-tune-it-for-your-workload">#</a></h2>
+<p>Drop a <code>redis-doctor.yml</code> next to your project and pass <code>--config</code>:</p>
+<pre><code class="language-bash">redis-doctor analyze redis://localhost:6379 --config redis-doctor.yml</code></pre>
+<p>You can change thresholds, declare TTL expectations for your key patterns, disable noisy rules, and ignore key prefixes. See <a href="configuration.html">Configuration</a>.</p>
+<h2 id="next-steps">Next steps<a class="anchor" href="#next-steps">#</a></h2>
+<ul><li>Explore every subcommand in the <a href="commands/index.html">Commands reference</a>.</li><li>Browse the <a href="findings-catalog.html">Findings catalog</a> to see everything the tool</li></ul>
+<p>can detect.</p>
+<ul><li>If you want to extend it, start with <a href="developer/architecture.html">Architecture</a>.</li></ul>
+<div class="pager">
+<a class="prev" href="index.html">← Redis Doctor</a>
+<a class="next" href="installation.html">Installation →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

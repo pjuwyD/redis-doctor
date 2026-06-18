@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Explore · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a class="active" href="explore.html">Explore</a></li>
+<li><a href="tui.html">Terminal UI</a></li>
+<li><a href="gui.html">Web dashboard</a></li>
+<li><a href="ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="explore">Explore<a class="anchor" href="#explore">#</a></h1>
+<p>The Explore tab lets you <strong>browse a Redis keyspace read-only</strong> — list keys, see each key&#x27;s type/TTL/memory/size, and peek at contents — without giving up the tool&#x27;s safety guarantees. It is deliberately <em>not</em> a full data browser by default.</p>
+<p>There are two tiers, and a lock between them:</p>
+<table><thead><tr><th>Tier</th><th>Default</th><th>Reads</th><th>Commands</th></tr></thead><tbody><tr><td><strong>Metadata + bounded peek</strong></td><td>on</td><td>key metadata + a small, bounded sample of contents</td><td><code>SCAN</code>, <code>TYPE</code>, <code>TTL</code>, <code>MEMORY USAGE</code>, <code>HSCAN</code>/<code>SSCAN</code>/<code>ZSCAN</code> <code>COUNT n</code>, <code>XRANGE COUNT n</code>, <code>GETRANGE</code>, <code>LINDEX</code></td></tr><tr><td><strong>Full value read</strong></td><td><strong>locked</strong></td><td>the whole value (still capped)</td><td><code>GET</code>, <code>HGETALL</code>, <code>SMEMBERS</code>, <code>LRANGE</code>, <code>ZRANGE</code>, …</td></tr></tbody></table>
+<p>The lock is enforced in the <a href="../safety.html">safety layer</a>, not just the UI: full-read commands belong to an &quot;expensive read&quot; tier that is refused unless the connection was opened with the unlock. So even a bug in the UI cannot pull full values while locked.</p>
+<h2 id="in-the-web-dashboard">In the web dashboard<a class="anchor" href="#in-the-web-dashboard">#</a></h2>
+<p>Open <code>serve</code> (<a href="gui.html">web dashboard</a>) and choose <strong>Explore</strong>:</p>
+<ol><li>Enter a target and an optional <code>MATCH</code> pattern (e.g. <code>session:*</code>), then <strong>Scan</strong>.</li></ol>
+<p>Listing uses <code>SCAN</code> — never <code>KEYS</code>.</p>
+<ol><li>Click any key to see its metadata and a <strong>bounded preview</strong> (e.g. the first 25</li></ol>
+<p>hash fields, a 4 KB slice of a string, a list&#x27;s head and tail).</p>
+<ol><li>To see whole values, tick <strong>🔒 full reads locked</strong> to unlock it</li></ol>
+<p>(<strong>🔓 full reads UNLOCKED</strong>). Subsequent key opens read the full value.</p>
+<ol><li><strong>Load more</strong> pages through the keyspace.</li></ol>
+<p>Even when unlocked, full reads are <strong>capped</strong> (<code>FULL_MAX_ELEMENTS</code> elements; a full string <code>GET</code> is refused above ~1 MB) so an unlock cannot pull an unbounded payload or stall the server.</p>
+<h2 id="json-values">JSON values<a class="anchor" href="#json-values">#</a></h2>
+<p>When a value is JSON (a string that parses as an object or array — common in queues, event payloads, and caches), the preview renders it as a <strong>collapsible tree</strong> rather than one long line:</p>
+<ul><li>the top level is expanded and everything nested is collapsed; click a node to</li></ul>
+<p>drill in;</p>
+<ul><li><strong>expand all</strong> / <strong>collapse all</strong> buttons and a <strong>filter</strong> box (matches keys and</li></ul>
+<p>values, auto-expands and shows only matching paths) sit above the tree;</p>
+<ul><li>each object/array node has a <strong>copy</strong> button (⧉) that copies that subtree as</li></ul>
+<p>formatted JSON;</p>
+<ul><li>a <strong>raw</strong> disclosure shows the exact original string.</li></ul>
+<p>JSON is also detected inside hash field values, list items, and stream field values, where it renders as a collapsed tree with the same toolbar (filter, expand/collapse, copy) right in the cell — handy for stream payloads. Non-JSON strings show as plain wrapped text; if a bounded peek truncates a large JSON value so it no longer parses, unlock and re-open the key to get the full, parseable value.</p>
+<h2 id="in-the-terminal-ui">In the terminal UI<a class="anchor" href="#in-the-terminal-ui">#</a></h2>
+<p>The <a href="tui.html">TUI</a> has an <strong>Explore</strong> panel too, but because it holds a single captured report and no live connection, it shows the <strong>metadata of the largest sampled keys</strong> (type, TTL, memory, size) — no value peeking. Press <code>e</code> to show more rows. For live browsing and value peeks, use the web dashboard.</p>
+<h2 id="what-it-will-not-do">What it will not do<a class="anchor" href="#what-it-will-not-do">#</a></h2>
+<ul><li>It never uses <code>KEYS</code> or <code>MONITOR</code>.</li><li>It never writes, deletes, or expires anything.</li><li>Bounded peeks cannot return a whole large collection in one call.</li><li>Full reads are gated behind an explicit unlock and still capped.</li></ul>
+<p>See <a href="../safety.html">Safety</a> for the complete command policy.</p>
+<div class="pager">
+<a class="prev" href="../safety.html">← Safety guardrails</a>
+<a class="next" href="tui.html">Terminal UI →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

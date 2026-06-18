@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>analyze · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="index.html">Commands</a></li>
+<li><a class="active" href="analyze.html">analyze</a></li>
+<li><a href="scan-keys.html">scan-keys</a></li>
+<li><a href="inspect-stream.html">inspect-stream</a></li>
+<li><a href="inspect-clients.html">inspect-clients</a></li>
+<li><a href="config-check.html">config-check</a></li>
+<li><a href="analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="report.html">report</a></li>
+<li><a href="diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="analyze">analyze<a class="anchor" href="#analyze">#</a></h1>
+<p>The primary command. Runs the full diagnostic pipeline and renders a report.</p>
+<pre><code class="language-bash">redis-doctor analyze &lt;redis-url&gt; [options]</code></pre>
+<h2 id="what-it-does">What it does<a class="anchor" href="#what-it-does">#</a></h2>
+<p>Runs all collectors and analyzers: server, memory, latency, config, persistence, replication, keyspace, TTL, big-key, types, streams, clients, slowlog, and security. Produces a health score and a list of <a href="../findings-catalog.html">findings</a>.</p>
+<h2 id="flags">Flags<a class="anchor" href="#flags">#</a></h2>
+<p>In addition to the <a href="index.html#connection-flags">connection flags</a>:</p>
+<pre><code class="language-text">--format terminal|markdown|json      --output &lt;path&gt;
+--fail-on none|warning|critical      --no-fail
+--config &lt;file&gt;
+--only &lt;module,module,...&gt;           run only these analyzer modules
+--skip &lt;module,module,...&gt;           skip these analyzer modules
+--sample-size --scan-count --max-scan-seconds
+--prefix-depth --prefix-separators
+--fleet &lt;fleet.yml&gt;                  run a fleet of targets (see below)</code></pre>
+<p>Module names for <code>--only</code>/<code>--skip</code>: <code>server</code>, <code>memory</code>, <code>latency</code>, <code>config</code>, <code>persistence</code>, <code>replication</code>, <code>keyspace</code>, <code>ttl</code>, <code>bigkey</code>, <code>types</code>, <code>streams</code>, <code>clients</code>, <code>slowlog</code>, <code>security</code>. The key-level modules (<code>ttl</code>, <code>bigkey</code>, <code>types</code>, <code>streams</code>) automatically pull in the <code>keyspace</code> sample they depend on.</p>
+<h2 id="examples">Examples<a class="anchor" href="#examples">#</a></h2>
+<pre><code class="language-bash"># Human-readable report
+redis-doctor analyze redis://localhost:6379
+
+# JSON for automation
+redis-doctor analyze redis://localhost:6379 --format json --output report.json
+
+# Markdown to a file
+redis-doctor analyze redis://localhost:6379 --format markdown --output report.md
+
+# CI gate
+redis-doctor analyze &quot;$REDIS_URL&quot; --fail-on critical
+
+# Only the streams and clients modules
+redis-doctor analyze redis://localhost:6379 --only streams,clients
+
+# Larger sample, longer scan budget
+redis-doctor analyze redis://localhost:6379 --sample-size 50000 --max-scan-seconds 60</code></pre>
+<p>See full output in <a href="../examples.html">Examples</a>.</p>
+<h2 id="fleet-mode">Fleet mode<a class="anchor" href="#fleet-mode">#</a></h2>
+<p><code>--fleet &lt;fleet.yml&gt;</code> runs every target sequentially and writes one combined JSON document instead of a single report:</p>
+<pre><code class="language-yaml"># fleet.yml
+targets:
+  - name: prod-cache
+    url: redis://cache-1:6379
+  - name: prod-queue
+    url: redis://queue-1:6379</code></pre>
+<pre><code class="language-bash">redis-doctor analyze --fleet fleet.yml --output fleet.json</code></pre>
+<p>The combined document has an <code>instances</code> array, each with <code>name</code>, redacted <code>target</code>, <code>score</code>, and the full <code>report</code> (or an <code>error</code> if that target was unreachable). The web dashboard&#x27;s Fleet view consumes the same idea — see <a href="../guides/gui.html">the GUI guide</a>.</p>
+<h2 id="exit-codes">Exit codes<a class="anchor" href="#exit-codes">#</a></h2>
+<p>Governed by <code>--fail-on</code>; see <a href="../output-and-exit-codes.html">Output &amp; exit codes</a>.</p>
+<div class="pager">
+<a class="prev" href="index.html">← Commands</a>
+<a class="next" href="scan-keys.html">scan-keys →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

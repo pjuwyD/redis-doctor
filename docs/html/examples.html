@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Examples · Redis Doctor docs</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="getting-started.html">Getting started</a></li>
+<li><a href="installation.html">Installation</a></li>
+<li><a class="active" href="examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="commands/index.html">Commands</a></li>
+<li><a href="commands/analyze.html">analyze</a></li>
+<li><a href="commands/scan-keys.html">scan-keys</a></li>
+<li><a href="commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="commands/config-check.html">config-check</a></li>
+<li><a href="commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="commands/report.html">report</a></li>
+<li><a href="commands/diff.html">diff</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="findings-catalog.html">Findings catalog</a></li>
+<li><a href="output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="guides/explore.html">Explore</a></li>
+<li><a href="guides/tui.html">Terminal UI</a></li>
+<li><a href="guides/gui.html">Web dashboard</a></li>
+<li><a href="guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="developer/architecture.html">Architecture</a></li>
+<li><a href="developer/collectors.html">Collectors</a></li>
+<li><a href="developer/analyzers.html">Analyzers</a></li>
+<li><a href="developer/rule-engine.html">Rule engine</a></li>
+<li><a href="developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="examples">Examples<a class="anchor" href="#examples">#</a></h1>
+<p>Real commands with real output. The &quot;bad&quot; instance below was seeded with 400 <code>lock:*</code> keys without TTL, 120 <code>session:user:*</code> keys, and a few thousand padded values under <code>noeviction</code> with no persistence — a deliberately unhealthy cache.</p>
+<h2 id="a-full-analyze-on-an-unhealthy-instance">A full <code>analyze</code> on an unhealthy instance<a class="anchor" href="#a-full-analyze-on-an-unhealthy-instance">#</a></h2>
+<pre><code class="language-bash">redis-doctor analyze redis://localhost:6379</code></pre>
+<pre><code class="language-text">Redis Doctor Report
+Target: redis://localhost:7799/0
+Generated: 2026-06-18 07:42:16
+Health score: 30/100
+╭─────────────── Summary ────────────────╮
+│ - Redis 7.0.15, role master, uptime 1s │
+│ - Memory: 2.3 MB / 4.0 MB (56%)        │
+│ - Clients: 1 connected, 0 blocked      │
+│ - Policy: noeviction                   │
+│ - Keys: 820                            │
+╰────────────────────────────────────────╯
+Key analysis based on sample:
+- scanned 820 keys from estimated 820 total keys
+- confidence: high
+- scan duration: 0.001s
+- complete scan: yes
+
+        Top prefixes by count
+┏━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━┓
+┃  # ┃ Prefix         ┃ Keys ┃ Share ┃
+┡━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━┩
+│  1 │ session:user:* │  120 │   15% │
+│  2 │ lock:200:*     │    1 │    0% │
+│ …  │ …              │  …   │   …   │
+└────┴────────────────┴──────┴───────┘
+Type distribution: string 100%
+
+3 critical  5 warning  1 info
+
+Critical findings:
+  [TTL] ttl.locks_without_ttl — 100% of lock:* keys have no TTL
+    Evidence: no_ttl=400, total_in_category=400, share=1.0
+    Impact: Locks without a TTL can deadlock workflows permanently if a holder dies.
+    Checks: redis-cli TTL &lt;key&gt;
+    Fixes: Set an appropriate EXPIRE/SETEX on these keys; Ensure code paths that
+create them set a TTL
+  [TTL] ttl.sessions_without_ttl — 100% of session/temp keys have no TTL
+    Evidence: no_ttl=120, total_in_category=120, share=1.0
+  [SECURITY] security.no_auth — Redis has no authentication configured
+    Evidence: requirepass_set=False, default_user_nopass=True
+
+Warnings:
+  [MEMORY] memory.high_fragmentation — Memory fragmentation ratio is high (3.53)
+  [CONFIG] config.risky_eviction_policy — maxmemory-policy is noeviction with a memory limit set
+  [CONFIG] config.no_persistence — Neither RDB nor AOF persistence is enabled
+  [PERSISTENCE] persistence.none_enabled — No persistence is enabled
+  [SECURITY] security.default_user — The default user is enabled / widely used
+
+Info:
+  [SERVER] server.recent_restart — Redis restarted within the last hour</code></pre>
+<p>Every finding includes Evidence, Impact, Checks, and Fixes lines (trimmed above for space).</p>
+<h2 id="keyspace-only-report">Keyspace-only report<a class="anchor" href="#keyspace-only-report">#</a></h2>
+<pre><code class="language-bash">redis-doctor scan-keys redis://localhost:6379</code></pre>
+<p>Prints the prefix-by-count and prefix-by-memory tables, the type distribution, and the sampling metadata block — without running the other analyzers:</p>
+<pre><code class="language-text">Key analysis based on sample:
+- scanned 820 keys from estimated 820 total keys
+- confidence: high
+
+        Top prefixes by count                    Top prefixes by memory
+┏━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━┓          ┏━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
+┃  # ┃ Prefix         ┃ Keys ┃          ┃  # ┃ Prefix         ┃  Memory ┃
+┡━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━┩          ┡━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
+│  1 │ session:user:* │  120 │          │  1 │ session:user:* │ 13.9 KB │
+└────┴────────────────┴──────┘          └────┴────────────────┴─────────┘
+Type distribution: string 100%</code></pre>
+<h2 id="config-persistence-replication-only">Config / persistence / replication only<a class="anchor" href="#config-persistence-replication-only">#</a></h2>
+<pre><code class="language-bash">redis-doctor config-check redis://localhost:6379</code></pre>
+<pre><code class="language-text">Health score: 85/100
+0 critical  3 warning  1 info
+
+Warnings:
+  [CONFIG] config.risky_eviction_policy — maxmemory-policy is noeviction with a memory limit set
+  [CONFIG] config.no_persistence — Neither RDB nor AOF persistence is enabled
+  [PERSISTENCE] persistence.none_enabled — No persistence is enabled</code></pre>
+<h2 id="json-for-automation">JSON for automation<a class="anchor" href="#json-for-automation">#</a></h2>
+<pre><code class="language-bash">redis-doctor analyze redis://localhost:6379 --format json --only server,memory</code></pre>
+<pre><code class="language-json">{
+  &quot;target&quot;: &quot;redis://localhost:6379/0&quot;,
+  &quot;redis_doctor_version&quot;: &quot;1.0.0&quot;,
+  &quot;health_score&quot;: 85,
+  &quot;category_scores&quot;: { &quot;server&quot;: 95, &quot;memory&quot;: 90, &quot;...&quot;: 100 },
+  &quot;summary&quot;: { &quot;critical&quot;: 0, &quot;warning&quot;: 3, &quot;info&quot;: 0 },
+  &quot;server&quot;: {
+    &quot;redis_version&quot;: &quot;7.4.7&quot;, &quot;role&quot;: &quot;master&quot;,
+    &quot;used_memory_bytes&quot;: 3330552, &quot;maxmemory_bytes&quot;: 0
+  },
+  &quot;findings&quot;: [ /* ... */ ]
+}</code></pre>
+<p>Pipe it into <code>jq</code>:</p>
+<pre><code class="language-bash">redis-doctor analyze redis://localhost:6379 --format json \
+  | jq -r &#x27;.findings[] | select(.severity==&quot;critical&quot;) | .id&#x27;</code></pre>
+<h2 id="compare-two-runs">Compare two runs<a class="anchor" href="#compare-two-runs">#</a></h2>
+<pre><code class="language-bash">redis-doctor analyze redis://localhost:6379 --format json --output before.json
+# ... time passes ...
+redis-doctor analyze redis://localhost:6379 --format json --output after.json
+redis-doctor diff before.json after.json</code></pre>
+<pre><code class="language-text">Since previous report:
+- health score 85 -&gt; 60 (-25)
+- memory changed by +38% (+1240000 bytes)
+- idle clients 44 -&gt; 426
+- stream live:Inform.stream grew by +122000 entries
+- 2 new finding(s): clients.idle_many, streams.pending_high</code></pre>
+<h2 id="focus-on-one-module">Focus on one module<a class="anchor" href="#focus-on-one-module">#</a></h2>
+<pre><code class="language-bash">redis-doctor analyze redis://localhost:6379 --only streams,clients
+redis-doctor analyze redis://localhost:6379 --skip keyspace,ttl,bigkey,types</code></pre>
+<h2 id="a-single-stream-deeply">A single stream, deeply<a class="anchor" href="#a-single-stream-deeply">#</a></h2>
+<pre><code class="language-bash">redis-doctor inspect-stream redis://localhost:6379 live:Inform.stream</code></pre>
+<pre><code class="language-text">                              Streams
+┃ Stream             ┃ Length ┃ Group         ┃ Pending ┃
+│ live:Inform.stream │  384221 │ tr069-workers │   92440 │
+
+Critical findings:
+  [STREAMS] streams.pending_high — Group tr069-workers on live:Inform.stream has 92,440 pending messages
+  [STREAMS] streams.idle_consumer_with_pending — Consumer worker-7 has 18,221 pending, idle 4h 12m</code></pre>
+<h2 id="ci-gate">CI gate<a class="anchor" href="#ci-gate">#</a></h2>
+<pre><code class="language-bash">redis-doctor analyze &quot;$REDIS_URL&quot; --fail-on critical
+echo &quot;exit code: $?&quot;   # 0 if healthy, 2 if any critical finding</code></pre>
+<p>See <a href="commands/index.html">Commands</a> for the full flag reference and <a href="guides/ci.html">CI integration</a> for pipeline snippets.</p>
+<div class="pager">
+<a class="prev" href="installation.html">← Installation</a>
+<a class="next" href="commands/index.html">Commands →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

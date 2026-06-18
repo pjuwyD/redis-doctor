@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CI integration · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="explore.html">Explore</a></li>
+<li><a href="tui.html">Terminal UI</a></li>
+<li><a href="gui.html">Web dashboard</a></li>
+<li><a class="active" href="ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="ci-integration">CI integration<a class="anchor" href="#ci-integration">#</a></h1>
+<p><code>analyze --fail-on critical</code> returns a non-zero exit code when problems are found, so it drops straight into a pipeline as a health gate. See the full <a href="../output-and-exit-codes.html#exit-codes">exit-code contract</a>.</p>
+<h2 id="github-actions">GitHub Actions<a class="anchor" href="#github-actions">#</a></h2>
+<pre><code class="language-yaml">- name: Redis health gate
+  run: |
+    pipx install redis-doctor
+    redis-doctor analyze &quot;$REDIS_URL&quot; --fail-on critical
+  env:
+    REDIS_URL: ${{ secrets.REDIS_URL }}</code></pre>
+<p>Archive a JSON report as an artifact and compare across runs:</p>
+<pre><code class="language-yaml">- name: Redis report
+  run: redis-doctor analyze &quot;$REDIS_URL&quot; --format json --output redis-report.json --no-fail
+- uses: actions/upload-artifact@v4
+  with:
+    name: redis-report
+    path: redis-report.json</code></pre>
+<h2 id="gitlab-ci">GitLab CI<a class="anchor" href="#gitlab-ci">#</a></h2>
+<pre><code class="language-yaml">redis-health:
+  image: python:3.11-slim
+  script:
+    - pip install redis-doctor
+    - redis-doctor analyze &quot;$REDIS_URL&quot; --fail-on critical</code></pre>
+<h2 id="kubernetes-cronjob">Kubernetes CronJob<a class="anchor" href="#kubernetes-cronjob">#</a></h2>
+<pre><code class="language-yaml">apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-doctor
+spec:
+  schedule: &quot;0 * * * *&quot;
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: redis-doctor
+              image: redis-doctor:latest
+              args: [&quot;analyze&quot;, &quot;redis://my-redis:6379&quot;, &quot;--fail-on&quot;, &quot;critical&quot;]</code></pre>
+<h2 id="tips">Tips<a class="anchor" href="#tips">#</a></h2>
+<ul><li>Use <code>--fail-on warning</code> for a stricter gate (exit <code>1</code> on warnings, <code>2</code> on</li></ul>
+<p>criticals).</p>
+<ul><li>Use <code>--no-fail</code> when you only want to capture a report, not gate the build.</li><li>Pass credentials via <code>REDIS_DOCTOR_PASSWORD</code> / <code>REDIS_DOCTOR_USERNAME</code> rather</li></ul>
+<p>than embedding them in the URL — the password is redacted from output either way (<a href="../safety.html">Safety</a>).</p>
+<ul><li>Disable noisy rules for your environment in a committed <code>redis-doctor.yml</code></li></ul>
+<p>(<a href="../configuration.html">Configuration</a>).</p>
+<div class="pager">
+<a class="prev" href="gui.html">← Web dashboard</a>
+<a class="next" href="../developer/architecture.html">Architecture →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

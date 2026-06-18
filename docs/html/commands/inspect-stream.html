@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>inspect-stream · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="index.html">Commands</a></li>
+<li><a href="analyze.html">analyze</a></li>
+<li><a href="scan-keys.html">scan-keys</a></li>
+<li><a class="active" href="inspect-stream.html">inspect-stream</a></li>
+<li><a href="inspect-clients.html">inspect-clients</a></li>
+<li><a href="config-check.html">config-check</a></li>
+<li><a href="analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="report.html">report</a></li>
+<li><a href="diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="inspect-stream">inspect-stream<a class="anchor" href="#inspect-stream">#</a></h1>
+<p>Deep diagnostic for a single named stream.</p>
+<pre><code class="language-bash">redis-doctor inspect-stream &lt;redis-url&gt; &lt;stream&gt; [options]</code></pre>
+<h2 id="what-it-does">What it does<a class="anchor" href="#what-it-does">#</a></h2>
+<p>Reads <code>XLEN</code>, <code>XINFO STREAM</code>, <code>XINFO GROUPS</code>, and <code>XINFO CONSUMERS</code> for the named stream and runs the stream analyzer over it. Unlike <code>analyze</code>, it does <strong>not</strong> sample the keyspace — it inspects exactly the stream you name, so it is cheap to run against a known problem stream.</p>
+<p>Emits the stream findings: <code>streams.length_high</code>, <code>streams.pending_high</code>, <code>streams.idle_consumer_with_pending</code>, <code>streams.no_consumers</code>, <code>streams.lag_high</code>, <code>streams.many_inactive_consumers</code>, <code>streams.no_groups</code> (see the <a href="../findings-catalog.html#streams">catalog</a>).</p>
+<h2 id="flags">Flags<a class="anchor" href="#flags">#</a></h2>
+<p><a href="index.html#connection-flags">Connection flags</a> plus <code>--format</code> and <code>--output</code>.</p>
+<h2 id="example">Example<a class="anchor" href="#example">#</a></h2>
+<pre><code class="language-bash">redis-doctor inspect-stream redis://localhost:6379 live:Inform.stream</code></pre>
+<pre><code class="language-text">                              Streams
+┃ Stream             ┃ Length ┃ Group         ┃ Consumers ┃ Pending ┃
+│ live:Inform.stream │  384221 │ tr069-workers │     1     │   92440 │
+
+Critical findings:
+  [STREAMS] streams.pending_high — Group tr069-workers on live:Inform.stream has 92,440 pending messages
+    Checks: redis-cli XINFO GROUPS live:Inform.stream | redis-cli XPENDING live:Inform.stream tr069-workers
+    Fixes: Scale up consumers; Reclaim stuck messages with XAUTOCLAIM
+  [STREAMS] streams.idle_consumer_with_pending — Consumer worker-7 has 18,221 pending, idle 4h 12m</code></pre>
+<p>Remediation suggestions name <code>XAUTOCLAIM</code>, <code>XGROUP DELCONSUMER</code>, and <code>XTRIM</code> but the tool never runs them — see <a href="../safety.html">Safety</a>.</p>
+<div class="pager">
+<a class="prev" href="scan-keys.html">← scan-keys</a>
+<a class="next" href="inspect-clients.html">inspect-clients →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

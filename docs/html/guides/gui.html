@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Web dashboard · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="explore.html">Explore</a></li>
+<li><a href="tui.html">Terminal UI</a></li>
+<li><a class="active" href="gui.html">Web dashboard</a></li>
+<li><a href="ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="web-dashboard">Web dashboard<a class="anchor" href="#web-dashboard">#</a></h1>
+<p>A local web dashboard and JSON API built with FastAPI. Requires the <code>gui</code> extra:</p>
+<pre><code class="language-bash">pip install &#x27;redis-doctor[gui]&#x27;
+redis-doctor serve --host 127.0.0.1 --port 8787</code></pre>
+<p>It binds to <code>127.0.0.1</code> by default — <strong>no data leaves the machine</strong>. Passwords entered for a run are used only for that request and are never persisted; the stored report carries only the redacted target.</p>
+<h2 id="views">Views<a class="anchor" href="#views">#</a></h2>
+<p>The single-page app (vanilla JS + Chart.js, no build step) offers:</p>
+<ul><li><strong>Dashboard</strong> — health-score, severity counts, category-score bars, and the</li></ul>
+<p>findings list with expand-for-detail. When the report is persisted (always, for runs started from the GUI), an <strong>Export: Markdown · PDF</strong> bar links to the download endpoints.</p>
+<ul><li><strong>Run</strong> — enter a target and analyze live.</li><li><strong>Explore</strong> — browse keys read-only with metadata + bounded preview, and a lock</li></ul>
+<p>to unlock full value reads. See the <a href="explore.html">Explore guide</a>.</p>
+<ul><li><strong>History</strong> — past reports (time, target, score, criticals); click to open, or</li></ul>
+<p>use the per-row <strong>MD</strong> / <strong>PDF</strong> links to export.</p>
+<ul><li><strong>Diff</strong> — pick two reports and see the <a href="../commands/diff.html">diff</a>.</li><li><strong>Schedules</strong> — create/list/delete cron schedules.</li><li><strong>Fleet</strong> — score cards for the instances configured via <code>--fleet</code> (below).</li></ul>
+<h2 id="json-api">JSON API<a class="anchor" href="#json-api">#</a></h2>
+<pre><code class="language-text">POST   /api/analyze      { target, options }        -&gt; Report JSON
+GET    /api/reports                                  -&gt; saved report metadata
+GET    /api/reports/{id}                             -&gt; one Report
+GET    /api/diff?before={id}&amp;after={id}              -&gt; Diff JSON
+POST   /api/schedule     { target, cron, notify }    -&gt; create a schedule
+GET    /api/schedule                                 -&gt; list schedules
+DELETE /api/schedule/{id}                            -&gt; remove a schedule
+GET    /api/export/{id}.md                           -&gt; markdown report
+GET    /api/export/{id}.pdf                           -&gt; rendered PDF report
+GET    /api/fleet                                    -&gt; configured fleet cards</code></pre>
+<p>Example:</p>
+<pre><code class="language-bash">curl -s localhost:8787/api/analyze \
+  -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;target&quot;:&quot;redis://localhost:6379&quot;,&quot;options&quot;:{}}&#x27; | jq .health_score</code></pre>
+<h2 id="history">History<a class="anchor" href="#history">#</a></h2>
+<p>Every run started from the dashboard is persisted to a SQLite database (<code>~/.redis-doctor/history.db</code> by default, configurable via <code>history.path</code>) with the full report plus indexable metadata. This is what powers the History and Diff views, so the GUI records runs regardless of the <code>history.enabled</code> flag — that flag only governs whether the <strong>CLI</strong> <code>analyze</code> writes to history. History survives restarts; only the redacted target is stored, never a password.</p>
+<h2 id="scheduling">Scheduling<a class="anchor" href="#scheduling">#</a></h2>
+<p>Schedules are backed by APScheduler. A schedule is <code>{ target, cron, notify }</code>; on fire it runs the pipeline, saves to history, and notifies per the configured channels. For unattended runs, prefer a Kubernetes CronJob or CI job calling <code>analyze --fail-on critical</code> — see <a href="ci.html">CI integration</a>.</p>
+<h2 id="notifications">Notifications<a class="anchor" href="#notifications">#</a></h2>
+<p>Configure Slack, email, or a generic webhook under <code>notify:</code> in the config. A run notifies only when findings meet your <code>fail_on</code> threshold, and only via channels you configured — never based on content discovered in Redis. See <a href="../safety.html">Safety</a>.</p>
+<h2 id="fleet">Fleet<a class="anchor" href="#fleet">#</a></h2>
+<p>The Fleet view shows one score card per instance you configure. Provide the list when launching the server:</p>
+<pre><code class="language-bash">redis-doctor serve --fleet fleet.yml</code></pre>
+<pre><code class="language-yaml"># fleet.yml
+targets:
+  - name: prod-cache
+    url: redis://cache-1:6379
+  - name: prod-queue
+    url: redis://queue-1:6379</code></pre>
+<p>Each card shows the <strong>latest stored health score</strong> for that target (from <a href="#history">history</a>, matched on the redacted target) and links to its latest report. A card reads <code>–</code> until that target has been analyzed at least once — run it from the <strong>Run</strong> view (or on a <a href="#scheduling">schedule</a>) and the card fills in. Without <code>--fleet</code>, the view explains how to configure one.</p>
+<h2 id="pdf-markdown-export">PDF / Markdown export<a class="anchor" href="#pdf-markdown-export">#</a></h2>
+<p>From the <strong>Dashboard</strong>, the <strong>Export</strong> bar links to the markdown and PDF downloads for the currently shown report. Directly, the endpoints are <code>GET /api/export/{id}.md</code> and <code>GET /api/export/{id}.pdf</code>. PDF rendering uses WeasyPrint, which needs native libraries — see <a href="../installation.html#weasyprint-system-libraries-pdf-export">Installation</a>.</p>
+<div class="pager">
+<a class="prev" href="tui.html">← Terminal UI</a>
+<a class="next" href="ci.html">CI integration →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

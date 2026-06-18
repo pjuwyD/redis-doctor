@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Architecture · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a class="active" href="architecture.html">Architecture</a></li>
+<li><a href="collectors.html">Collectors</a></li>
+<li><a href="analyzers.html">Analyzers</a></li>
+<li><a href="rule-engine.html">Rule engine</a></li>
+<li><a href="adding-a-module.html">Adding a module</a></li>
+<li><a href="testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="architecture">Architecture<a class="anchor" href="#architecture">#</a></h1>
+<p>This page explains how the pieces fit together so you can extend the tool with confidence. For a step-by-step recipe, jump to <a href="adding-a-module.html">Adding a module</a>.</p>
+<h2 id="the-shape-of-a-run">The shape of a run<a class="anchor" href="#the-shape-of-a-run">#</a></h2>
+<pre><code class="language-text">CLI (Typer)
+  └─ parse target + config            connection.py, config.py
+  └─ connect() -&gt; SafeRedis           connection.py + safety.py
+  └─ run_pipeline(safe, config)       pipeline.py
+        ├─ collect phase  : every Collector reads Redis -&gt; ctx.collected[name]
+        ├─ analyze phase  : every Analyzer reads ctx.collected -&gt; [Finding]
+        ├─ rule engine    : drop findings whose rule is disabled/ignored
+        └─ assemble Report: score, category scores, summary, stats
+  └─ emit_report(report, fmt, output) output/*.py
+  └─ exit code                        from --fail-on</code></pre>
+<h2 id="core-principle-findings-are-the-product">Core principle: findings are the product<a class="anchor" href="#core-principle-findings-are-the-product">#</a></h2>
+<p>Every analyzer&#x27;s real output is a list of <code>Finding</code> objects with stable IDs (see the <a href="../findings-catalog.html">findings catalog</a>). The health score, terminal text, markdown, JSON, TUI, and GUI are all just <em>renderings</em> of findings. If you add detection logic, you are adding findings.</p>
+<h2 id="data-model">Data model<a class="anchor" href="#data-model">#</a></h2>
+<p>All models are Pydantic v2 and JSON-serializable; they are the only types that cross module boundaries.</p>
+<ul><li><strong><code>Finding</code></strong> — <code>id</code>, <code>severity</code>, <code>category</code>, <code>confidence</code>, <code>title</code>,</li></ul>
+<p><code>explanation</code>, <code>evidence</code> (machine-readable facts), <code>suggested_checks</code>, <code>suggested_fixes</code>, <code>affected</code>.</p>
+<ul><li><strong><code>Report</code></strong> — target (redacted), timestamp, version, duration, <code>sampled</code>,</li></ul>
+<p><code>health_score</code>, <code>category_scores</code>, <code>summary</code>, <code>server</code>, <code>findings</code>, <code>skipped</code>, <code>stats</code>.</p>
+<ul><li><strong><code>RedisTarget</code></strong> — parsed connection params; stores <em>whether</em> a password</li></ul>
+<p>exists, never the value (it is excluded from serialization).</p>
+<ul><li>Supporting models: <code>ServerInfo</code>, <code>MemoryStats</code>, <code>KeySample</code>/<code>KeyInfo</code>,</li></ul>
+<p><code>StreamInfo</code>/<code>StreamGroup</code>/<code>StreamConsumer</code>, <code>ClientInfo</code>, <code>SlowlogEntry</code>.</p>
+<h2 id="the-pipeline">The pipeline<a class="anchor" href="#the-pipeline">#</a></h2>
+<p><code>pipeline.py</code> owns the orchestration:</p>
+<ul><li><strong><code>_registry()</code></strong> lists <code>ModuleSpec(name, collector, analyzer)</code> entries in run</li></ul>
+<p>order. <strong>Each module is added here.</strong> A module may be collector-only, analyzer-only, or both.</p>
+<ul><li><strong>Collect phase runs fully before the analyze phase.</strong> This means analyzers can</li></ul>
+<p>cross-read any other module&#x27;s collected data via <code>ctx.collected[...]</code> regardless of registry order. For example, the persistence analyzer reads the <code>config</code> collector&#x27;s values.</p>
+<ul><li><strong><code>RunContext</code></strong> is the shared state: the <code>SafeRedis</code> client, the <code>Config</code>, the</li></ul>
+<p><code>RuleEngine</code>, <code>collected</code> results, <code>skipped</code> notes, cached INFO fields, and CLI <code>options</code>.</p>
+<ul><li><strong><code>_DEPENDENCIES</code></strong> pulls in a prerequisite collector — e.g. <code>ttl</code>, <code>bigkey</code>,</li></ul>
+<p><code>types</code>, and <code>streams</code> depend on the <code>keyspace</code> sample. <code>disable_dependencies</code> skips this (used by <a href="../commands/inspect-stream.html"><code>inspect-stream</code></a>, which names one stream and does not want a full keyspace scan).</p>
+<ul><li><strong>Resilience</strong>: a collector that hits an ACL/permission error records a</li></ul>
+<p><code>SkippedModule</code> and returns <code>None</code>; an analyzer that raises is caught and recorded. One failing module never aborts the run.</p>
+<p>Sentinel and Cluster are <strong>not</strong> in the registry — they are standalone (<code>collect_sentinel</code>/<code>analyze_sentinel</code>, <code>collect_cluster</code>/<code>analyze_cluster</code>) and assemble a report with <code>build_report()</code>, because they connect differently (multiple Sentinel nodes; per-node cluster connections).</p>
+<h2 id="scoring">Scoring<a class="anchor" href="#scoring">#</a></h2>
+<p><code>scoring.py</code> implements the score: start at 100, −15 per critical, −5 per warning, 0 per info, clamped to <code>[0, 100]</code>. The same formula per category yields <code>category_scores</code>. See <a href="../output-and-exit-codes.html#health-score">Output &amp; exit codes</a>.</p>
+<h2 id="project-layout">Project layout<a class="anchor" href="#project-layout">#</a></h2>
+<pre><code class="language-text">redis_doctor/
+  cli.py            Typer app; all subcommands
+  connection.py     RedisTarget parsing, connect(), SafeRedis wrapper
+  safety.py         command allow/deny lists
+  config.py         config loading + schema
+  pipeline.py       collect -&gt; analyze -&gt; score -&gt; Report, build_report()
+  scoring.py        health score
+  rule_engine.py    rule pack + overrides + enable/ignore
+  models/           Pydantic models
+  collectors/       read Redis -&gt; model objects
+  analyzers/        model objects -&gt; findings
+  output/           terminal, json, markdown, pdf
+  history/          SQLite store + diff
+  notify/           slack, email, webhook
+  tui/              Textual app + panels
+  gui/              FastAPI server + static SPA
+rules/default.yml   shipped rule pack</code></pre>
+<h2 id="see-also">See also<a class="anchor" href="#see-also">#</a></h2>
+<ul><li><a href="collectors.html">Collectors</a> and <a href="analyzers.html">Analyzers</a></li><li><a href="rule-engine.html">Rule engine</a></li><li><a href="adding-a-module.html">Adding a module</a></li><li><a href="testing.html">Testing</a></li></ul>
+<div class="pager">
+<a class="prev" href="../guides/ci.html">← CI integration</a>
+<a class="next" href="collectors.html">Collectors →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

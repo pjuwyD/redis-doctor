@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Safety guardrails · Redis Doctor docs</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="getting-started.html">Getting started</a></li>
+<li><a href="installation.html">Installation</a></li>
+<li><a href="examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="commands/index.html">Commands</a></li>
+<li><a href="commands/analyze.html">analyze</a></li>
+<li><a href="commands/scan-keys.html">scan-keys</a></li>
+<li><a href="commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="commands/config-check.html">config-check</a></li>
+<li><a href="commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="commands/report.html">report</a></li>
+<li><a href="commands/diff.html">diff</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="findings-catalog.html">Findings catalog</a></li>
+<li><a href="output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a class="active" href="safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="guides/explore.html">Explore</a></li>
+<li><a href="guides/tui.html">Terminal UI</a></li>
+<li><a href="guides/gui.html">Web dashboard</a></li>
+<li><a href="guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="developer/architecture.html">Architecture</a></li>
+<li><a href="developer/collectors.html">Collectors</a></li>
+<li><a href="developer/analyzers.html">Analyzers</a></li>
+<li><a href="developer/rule-engine.html">Rule engine</a></li>
+<li><a href="developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="safety-guardrails">Safety guardrails<a class="anchor" href="#safety-guardrails">#</a></h1>
+<p>Redis Doctor is <strong>read-only by default</strong> and is designed to be safe to run against production. The guardrails below are enforced centrally in <code>safety.py</code> and are consulted before any command runs, so no analyzer can issue an unsafe command even by accident.</p>
+<h2 id="allowed-read-only">Allowed (read-only)<a class="anchor" href="#allowed-read-only">#</a></h2>
+<p><code>PING</code>, <code>INFO</code>, <code>CONFIG GET</code>, <code>DBSIZE</code>, <code>CLIENT LIST</code>, <code>CLIENT INFO</code>, <code>SLOWLOG GET</code>, <code>SLOWLOG LEN</code>, <code>LATENCY LATEST</code>, <code>LATENCY DOCTOR</code>, <code>MEMORY STATS</code>, <code>MEMORY USAGE</code>, <code>SCAN</code>, <code>TYPE</code>, <code>TTL</code>, <code>PTTL</code>, <code>STRLEN</code>, <code>LLEN</code>, <code>SCARD</code>, <code>ZCARD</code>, <code>HLEN</code>, <code>XLEN</code>, <code>XINFO STREAM</code>, <code>XINFO GROUPS</code>, <code>XINFO CONSUMERS</code>, <code>ACL WHOAMI</code>, <code>ACL LIST</code> (redacted), read-only <code>SENTINEL</code> subcommands, read-only <code>CLUSTER</code> subcommands.</p>
+<h2 id="bounded-reads-allowed-by-default">Bounded reads (allowed by default)<a class="anchor" href="#bounded-reads-allowed-by-default">#</a></h2>
+<p>For the <a href="guides/explore.html">Explore</a> feature, a set of cursor- or range-bounded reads is allowed by default: <code>HSCAN</code>, <code>SSCAN</code>, <code>ZSCAN</code>, <code>XRANGE</code>, <code>XREVRANGE</code>, <code>GETRANGE</code>, <code>LINDEX</code>, <code>OBJECT ENCODING</code>. With a <code>COUNT</code>/range (which the Explore service always passes) these cannot return a whole large value in one call.</p>
+<h2 id="full-value-reads-gated-by-an-explicit-unlock">Full value reads — gated by an explicit unlock<a class="anchor" href="#full-value-reads-gated-by-an-explicit-unlock">#</a></h2>
+<p>Full-value reads (<code>GET</code>, <code>MGET</code>, <code>HGETALL</code>, <code>HKEYS</code>, <code>HVALS</code>, <code>LRANGE</code>, <code>SMEMBERS</code>, <code>ZRANGE</code>, …) are O(N) and expose data, so they are blocked unless the connection is explicitly unlocked (the Explore tab&#x27;s lock toggle / an <code>allow_expensive</code> connection). They are reads, never writes — <code>allow_write</code> does <strong>not</strong> unlock them. Even when unlocked, the Explore service caps how much it reads. See the <a href="guides/explore.html">Explore guide</a>.</p>
+<h2 id="never-allowed-under-any-flag">Never allowed — under any flag<a class="anchor" href="#never-allowed-under-any-flag">#</a></h2>
+<p><code>KEYS</code> and <code>MONITOR</code> are blocked unconditionally. Attempting them raises <code>UnsafeCommandError</code>. The keyspace is explored only with <code>SCAN</code>.</p>
+<h2 id="blocked-unless-allow-write-no-command-path-uses-this">Blocked unless <code>--allow-write</code> (no command path uses this)<a class="anchor" href="#blocked-unless-allow-write-no-command-path-uses-this">#</a></h2>
+<p><code>FLUSHDB</code>, <code>FLUSHALL</code>, <code>CLIENT KILL</code>, <code>CONFIG SET</code>, <code>EVAL</code>, <code>EVALSHA</code>, <code>SCRIPT FLUSH</code>, <code>MEMORY PURGE</code>, <code>XTRIM</code>, <code>XGROUP DELCONSUMER</code>, <code>XAUTOCLAIM</code>, <code>DEL</code>, <code>EXPIRE</code>, and any other mutating command. Remediation suggestions may <em>name</em> commands like <code>XTRIM</code> or <code>XAUTOCLAIM</code>, but the tool never runs them.</p>
+<h2 id="always">Always<a class="anchor" href="#always">#</a></h2>
+<ul><li><strong>Every</strong> Redis call is wrapped with a timeout (<code>--socket-timeout</code>, default 5s).</li><li><strong>Credentials are redacted</strong> from logs, reports, and the rendered target string.</li></ul>
+<p>A password in a URL becomes <code>***</code>. <code>RedisTarget</code> stores only <em>whether</em> a password exists; the value is excluded from serialization entirely.</p>
+<ul><li><strong>ACL output is aggressively redacted</strong> — password hashes (<code>#...</code>) and inline</li></ul>
+<p>passwords (<code>&gt;...</code>) are masked before anything is stored or displayed.</p>
+<ul><li><strong>Slowlog arguments are redacted</strong> — <code>AUTH</code>/<code>HELLO</code> arguments and any</li></ul>
+<p>high-entropy token are replaced with <code>***</code>.</p>
+<ul><li>The keyspace is <strong>sampled, not fully scanned</strong>, and the report states the sample</li></ul>
+<p>size and confidence.</p>
+<h2 id="how-it-is-enforced">How it is enforced<a class="anchor" href="#how-it-is-enforced">#</a></h2>
+<p>The connection wrapper (<code>SafeRedis</code>) routes every command — including pipelined batches — through <code>safety.check_command(...)</code> first. Analyzers receive this wrapper, never a raw client, so the policy cannot be bypassed.</p>
+<pre><code class="language-text">analyzer ──► SafeRedis.execute(&quot;CONFIG&quot;, &quot;GET&quot;, &quot;maxmemory&quot;)
+                     │
+                     └─► safety.check_command(&quot;CONFIG&quot;, &quot;GET&quot;, ...) ──► allowed
+                     └─► safety.check_command(&quot;CONFIG&quot;, &quot;SET&quot;, ...) ──► UnsafeCommandError</code></pre>
+<h2 id="privacy">Privacy<a class="anchor" href="#privacy">#</a></h2>
+<p>No telemetry. Nothing leaves the machine. The tool works fully offline / air-gapped, and the web dashboard binds to <code>127.0.0.1</code> by default.</p>
+<div class="pager">
+<a class="prev" href="output-and-exit-codes.html">← Output formats &amp; exit codes</a>
+<a class="next" href="guides/explore.html">Explore →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

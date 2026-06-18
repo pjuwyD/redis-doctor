@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Collectors · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a class="active" href="collectors.html">Collectors</a></li>
+<li><a href="analyzers.html">Analyzers</a></li>
+<li><a href="rule-engine.html">Rule engine</a></li>
+<li><a href="adding-a-module.html">Adding a module</a></li>
+<li><a href="testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="collectors">Collectors<a class="anchor" href="#collectors">#</a></h1>
+<p>A <strong>collector</strong> reads data from Redis and returns raw model objects. It never produces findings — that is the <a href="analyzers.html">analyzer</a>&#x27;s job.</p>
+<h2 id="the-contract">The contract<a class="anchor" href="#the-contract">#</a></h2>
+<pre><code class="language-python">from redis_doctor.collectors.base import Collector
+
+class MyCollector(Collector):
+    name = &quot;mymodule&quot;
+
+    def collect(self, ctx) -&gt; SomeModel | None:
+        raw = ctx.redis.execute(&quot;INFO&quot;, &quot;everything&quot;)  # guarded read
+        return parse(raw)</code></pre>
+<ul><li><code>name</code> is the key under which the result is stored: <code>ctx.collected[name]</code>.</li><li><code>collect(ctx)</code> returns a model object (or <code>None</code>).</li><li>The base class wraps <code>collect()</code> in <code>run()</code>, which catches</li></ul>
+<p><code>redis.ResponseError</code> (ACL/permission/unknown-command) and connection/timeout errors, records a <code>SkippedModule</code>, and returns <code>None</code>. <strong>Do not</strong> swallow those yourself — let the base handle graceful degradation.</p>
+<h2 id="reading-redis-safely">Reading Redis safely<a class="anchor" href="#reading-redis-safely">#</a></h2>
+<p>Use <code>ctx.redis</code> (a <code>SafeRedis</code>). Every command is checked against the <a href="../safety.html">safety policy</a> before it runs:</p>
+<pre><code class="language-python">ctx.redis.execute(&quot;CONFIG&quot;, &quot;GET&quot;, &quot;maxmemory&quot;)     # single command
+ctx.redis.pipe([(&quot;TYPE&quot;, k), (&quot;TTL&quot;, k)])            # guarded pipeline</code></pre>
+<p><code>pipe()</code> runs many read commands in one round trip and returns per-command results (errors come back as values, not exceptions), which is how the keyspace sampler enriches thousands of keys efficiently.</p>
+<h2 id="shared-info">Shared INFO<a class="anchor" href="#shared-info">#</a></h2>
+<p><code>ctx.info_fields()</code> returns the parsed <code>INFO</code> dict, fetching it once and caching it on the context. Several collectors (memory, persistence, replication) read from it instead of issuing their own <code>INFO</code>.</p>
+<h2 id="keyspace-sampler">Keyspace sampler<a class="anchor" href="#keyspace-sampler">#</a></h2>
+<p><code>collectors/keyspace.py</code> is the most involved collector and the foundation for the key-level analyzers. It:</p>
+<ul><li>explores the keyspace with <code>SCAN</code> + <code>COUNT</code> (never <code>KEYS</code>);</li><li>stops when <strong>any</strong> limit is hit — <code>sample_size</code> keys or <code>max_seconds</code>;</li><li>excludes <code>ignore.keys</code> patterns;</li><li>enriches each sampled key <strong>in one pass</strong> with <code>TYPE</code>, <code>TTL</code>, <code>MEMORY USAGE</code>, and</li></ul>
+<p>the type-appropriate size command (<code>STRLEN</code>/<code>LLEN</code>/<code>SCARD</code>/<code>ZCARD</code>/<code>HLEN</code>/<code>XLEN</code>) via pipelined batches;</p>
+<ul><li>records <code>KeySample.complete</code> and a confidence level (<code>high</code> if ≥50% of DBSIZE or</li></ul>
+<p>the DB is small, <code>medium</code> if 5–50%, <code>low</code> if &lt;5%);</p>
+<ul><li>groups keys into prefixes by <code>prefix_depth</code>/<code>prefix_separators</code>.</li></ul>
+<p>Because the sample already carries type/TTL/memory/element-count, the <code>ttl</code>, <code>bigkey</code>, and <code>types</code> analyzers need <strong>no</strong> extra Redis reads — they are analyzer-only modules that read <code>ctx.collected[&quot;keyspace&quot;]</code>.</p>
+<h2 id="where-collected-data-is-exposed">Where collected data is exposed<a class="anchor" href="#where-collected-data-is-exposed">#</a></h2>
+<p>Collectors may also stash a render-friendly summary into <code>report.stats</code> (done in <code>pipeline._build_stats</code>) so the terminal/TUI/GUI can show prefix tables, client groupings, stream tables, etc., without re-deriving them.</p>
+<h2 id="existing-collectors">Existing collectors<a class="anchor" href="#existing-collectors">#</a></h2>
+<p><code>info</code>, <code>memory</code>, <code>latency</code>, <code>config_values</code>, <code>persistence</code>, <code>replication</code>, <code>keyspace</code>, <code>streams</code>, <code>clients</code>, <code>slowlog</code>, <code>security</code> (registry); <code>sentinel</code>, <code>cluster</code> (standalone).</p>
+<div class="pager">
+<a class="prev" href="architecture.html">← Architecture</a>
+<a class="next" href="analyzers.html">Analyzers →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

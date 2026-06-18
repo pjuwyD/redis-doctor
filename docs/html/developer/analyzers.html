@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Analyzers · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="../commands/index.html">Commands</a></li>
+<li><a href="../commands/analyze.html">analyze</a></li>
+<li><a href="../commands/scan-keys.html">scan-keys</a></li>
+<li><a href="../commands/inspect-stream.html">inspect-stream</a></li>
+<li><a href="../commands/inspect-clients.html">inspect-clients</a></li>
+<li><a href="../commands/config-check.html">config-check</a></li>
+<li><a href="../commands/analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="../commands/report.html">report</a></li>
+<li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="collectors.html">Collectors</a></li>
+<li><a class="active" href="analyzers.html">Analyzers</a></li>
+<li><a href="rule-engine.html">Rule engine</a></li>
+<li><a href="adding-a-module.html">Adding a module</a></li>
+<li><a href="testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="analyzers">Analyzers<a class="anchor" href="#analyzers">#</a></h1>
+<p>An <strong>analyzer</strong> turns collected data into <a href="architecture.html#data-model"><code>Finding</code></a> objects. It reads from <code>ctx.collected</code> and never touches Redis directly.</p>
+<h2 id="the-contract">The contract<a class="anchor" href="#the-contract">#</a></h2>
+<pre><code class="language-python">from redis_doctor.analyzers.base import Analyzer
+from redis_doctor.models.finding import Category, Finding, Severity
+
+class MyAnalyzer(Analyzer):
+    name = &quot;mymodule&quot;
+
+    def analyze(self, ctx) -&gt; list[Finding]:
+        data = ctx.collected.get(&quot;mymodule&quot;)
+        if data is None:          # collector was skipped — degrade quietly
+            return []
+        th = ctx.config.thresholds
+        findings: list[Finding] = []
+        if data.some_metric &gt; th.some_threshold:
+            findings.append(Finding(
+                id=&quot;mymodule.some_problem&quot;,
+                severity=Severity.WARNING,
+                category=Category.MEMORY,
+                title=&quot;One-line human summary&quot;,
+                explanation=&quot;Why this is risky, in plain language.&quot;,
+                evidence={&quot;some_metric&quot;: data.some_metric},
+                suggested_checks=[&quot;redis-cli ...&quot;],
+                suggested_fixes=[&quot;Concrete remediation (never auto-applied)&quot;],
+                affected=[&quot;optional key/prefix/addr names&quot;],
+            ))
+        return findings</code></pre>
+<h2 id="rules-to-follow">Rules to follow<a class="anchor" href="#rules-to-follow">#</a></h2>
+<ul><li><strong>Return <code>[]</code> when your input is missing.</strong> If <code>ctx.collected.get(name)</code> is</li></ul>
+<p><code>None</code>, the collector was skipped — do not raise.</p>
+<ul><li><strong>Use stable IDs from the <a href="../findings-catalog.html">catalog</a>.</strong> Tests assert on</li></ul>
+<p>them; they are a contract.</p>
+<ul><li><strong>Read thresholds from config, do not hardcode.</strong> Global thresholds live in</li></ul>
+<p><code>ctx.config.thresholds</code>. For per-rule overrides, ask the rule engine: <code>ctx.rules.get(&quot;mymodule.some_problem&quot;).get(&quot;warning_pct&quot;, default)</code> — see <a href="rule-engine.html">Rule engine</a>.</p>
+<ul><li><strong>Make <code>evidence</code> machine-readable</strong> (the numbers that triggered the finding).</li></ul>
+<p>Put the human story in <code>explanation</code>.</p>
+<ul><li><strong><code>affected</code> holds user data</strong> (key names, prefixes, client addresses). The</li></ul>
+<p>renderers treat these as plain text so they are never interpreted as markup.</p>
+<ul><li><strong>Enable/ignore is not your concern.</strong> The pipeline filters emitted findings</li></ul>
+<p>through <code>RuleEngine.is_active(id)</code>. Just emit; the engine decides.</p>
+<h2 id="severity">Severity<a class="anchor" href="#severity">#</a></h2>
+<p>Pick severity by impact, and let thresholds decide the boundary:</p>
+<ul><li><strong>critical</strong> — imminent data loss, write rejection, or outage (e.g.</li></ul>
+<p><code>memory.high_usage_noeviction</code>, <code>ttl.locks_without_ttl</code>, <code>persistence.rdb_failed</code>).</p>
+<ul><li><strong>warning</strong> — a real risk that is not yet an outage.</li><li><strong>info</strong> — context worth noting, no score penalty.</li></ul>
+<h2 id="registration">Registration<a class="anchor" href="#registration">#</a></h2>
+<p>Add your analyzer to <code>_registry()</code> in <code>pipeline.py</code>, paired with its collector (or <code>None</code> if it reuses another module&#x27;s data). See <a href="adding-a-module.html">Adding a module</a>.</p>
+<h2 id="standalone-analyzers">Standalone analyzers<a class="anchor" href="#standalone-analyzers">#</a></h2>
+<p>Sentinel and Cluster analyzers are plain functions (<code>analyze_sentinel(topo, cfg)</code>, <code>analyze_cluster(data)</code>) rather than registry classes, because they run outside the main pipeline. They still return <code>list[Finding]</code> and feed <code>build_report()</code>.</p>
+<div class="pager">
+<a class="prev" href="collectors.html">← Collectors</a>
+<a class="next" href="rule-engine.html">Rule engine →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>
