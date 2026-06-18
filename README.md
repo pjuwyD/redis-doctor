@@ -14,8 +14,10 @@ redis-doctor analyze redis://localhost:6379
 
 ## Documentation
 
-Full documentation lives in [`docs/`](docs/). Read the Markdown source starting at
-[`docs/md/index.md`](docs/md/index.md), or build the browsable HTML site:
+**Browse the HTML docs online:** https://pjuwyd.github.io/redis-doctor/html/
+
+The source lives in [`docs/`](docs/) — read the Markdown starting at
+[`docs/md/index.md`](docs/md/index.md), or rebuild the HTML site locally:
 
 ```bash
 python docs/tools/converter.py     # builds docs/html/ ; open docs/html/index.html
