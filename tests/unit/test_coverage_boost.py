@@ -77,7 +77,7 @@ def test_config_tcp_keepalive_and_slowlog_disabled(ctx):
     assert "config.risky_eviction_policy" not in f  # allkeys-lru is fine
 
 
-def test_config_risky_eviction_and_no_persistence(ctx):
+def test_config_risky_eviction_policy(ctx):
     ctx.collected["config_values"] = {
         "maxmemory": "100",
         "maxmemory-policy": "noeviction",
@@ -89,7 +89,8 @@ def test_config_risky_eviction_and_no_persistence(ctx):
     }
     f = _ids(ConfigAnalyzer().analyze(ctx))
     assert "config.risky_eviction_policy" in f
-    assert "config.no_persistence" in f
+    # 'no persistence' is reported by the persistence module, not config.
+    assert "config.no_persistence" not in f
 
 
 # --- connection -----------------------------------------------------------

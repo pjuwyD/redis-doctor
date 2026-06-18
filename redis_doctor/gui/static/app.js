@@ -11,6 +11,7 @@ function showView(name) {
   if (name === "history") loadHistory();
   if (name === "schedules") loadSchedules();
   if (name === "fleet") loadFleet();
+  if (name === "suppressions") loadSuppressions();
 }
 
 function esc(v) {
@@ -18,6 +19,9 @@ function esc(v) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+function escAttr(v) {
+  return esc(v).replace(/"/g, "&quot;");
 }
 
 document.querySelectorAll("#nav button").forEach((b) =>
@@ -48,6 +52,113 @@ async function jpost(url, body) {
   return r.json();
 }
 
+function fmtNum(n) {
+  return n == null ? "–" : Number(n).toLocaleString();
+}
+function ovCard(value, label, help) {
+  const attrs = help ? ` class="ov-card has-tip" data-tip="${escAttr(help)}"` : ` class="ov-card"`;
+  return `<div${attrs}><div class="ov-val">${esc(value)}</div><div class="ov-lab">${esc(label)}</div></div>`;
+}
+
+const STATE_HELP = {
+  active: "Connection with recent activity (command within the last 60s).",
+  idle: "No command for 60s or more. Many long-idle clients with timeout=0 can leak connections.",
+  blocked: "Waiting inside a blocking command (BLPOP/BRPOP/XREAD/WAIT).",
+  closing: "Marked to be closed after its reply is written.",
+  slow_consumer: "Large output buffer — the client isn't reading replies fast enough.",
+  pubsub: "Pub/Sub subscriber connection.",
+  monitor: "Client running in MONITOR mode (streams every command; heavy).",
+  replica_link: "Replication link to a replica or master, not an application client.",
+};
+
+function renderOverview(ov) {
+  const box = document.getElementById("overview");
+  if (!ov) {
+    box.innerHTML = "";
+    return;
+  }
+  const cards = [];
+  if (ov.keys)
+    cards.push(
+      ovCard(
+        fmtNum(ov.keys.total) + (ov.keys.complete ? "" : "*"),
+        "Keys",
+        "Total keys in the DB (DBSIZE)." + (ov.keys.complete ? "" : " * = estimated from a sample, not a full scan.")
+      )
+    );
+  if (ov.streams)
+    cards.push(
+      ovCard(fmtNum(ov.streams.count), "Streams", "Stream keys found in the sample (and total pending across their groups).")
+    );
+  if (ov.scripting)
+    cards.push(
+      ovCard(
+        `${ov.scripting.cached_scripts} / ${ov.scripting.functions}`,
+        "Scripts / Functions",
+        "Cached Lua scripts (EVAL/EVALSHA) / registered Functions. Two separate subsystems."
+      )
+    );
+  const c = ov.clients;
+  if (c)
+    cards.push(
+      ovCard(
+        fmtNum(c.total) + (c.blocked ? ` · ${c.blocked} blk` : ""),
+        "Clients",
+        "Connected clients" + (c.maxclients ? ` of ${c.maxclients} maxclients` : "") + ". 'blk' = blocked on a blocking command."
+      )
+    );
+  const m = ov.memory;
+  if (m)
+    cards.push(
+      ovCard(
+        m.pct != null ? `${m.pct}%` : humanBytes(m.used_bytes),
+        "Memory used",
+        m.pct != null
+          ? `${humanBytes(m.used_bytes)} of the ${m.policy} maxmemory limit.`
+          : `${humanBytes(m.used_bytes)} used; no maxmemory limit set (${m.policy}).`
+      )
+    );
+  const s = ov.server;
+  if (s) {
+    if (s.hit_rate != null)
+      cards.push(
+        ovCard(
+          `${s.hit_rate}%`,
+          "Hit rate",
+          "keyspace_hits / (hits + misses) since start: how often key lookups find the key. Low values suggest cache misses, churn, or wrong TTLs."
+        )
+      );
+    cards.push(
+      ovCard(fmtNum(s.ops_per_sec), "Ops/sec", "Commands processed per second right now (instantaneous_ops_per_sec).")
+    );
+  }
+  let html = `<div class="ov-cards">${cards.join("")}</div>`;
+
+  if (c && c.states && Object.keys(c.states).length) {
+    const entries = Object.entries(c.states).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((a, [, v]) => a + v, 0) || 1;
+    const segs = entries
+      .map(
+        ([n, v]) =>
+          `<span class="seg s-${n}" style="width:${(100 * v) / total}%" title="${esc(n.replace(/_/g, " "))}: ${v} — ${esc(STATE_HELP[n] || "")}"></span>`
+      )
+      .join("");
+    const legend = entries
+      .map(
+        ([n, v]) =>
+          `<span class="lg has-tip tip-up" data-tip="${escAttr(STATE_HELP[n] || n)}">` +
+          `<i class="dot s-${n}"></i>${esc(n.replace(/_/g, " "))} ${v}</span>`
+      )
+      .join("");
+    html +=
+      `<div class="ov-sub has-tip" data-tip="Redis's application-level view of each ` +
+      `connection (not kernel TCP states).">Client states</div>` +
+      `<div class="statebar">${segs}</div>` +
+      `<div class="legend-row">${legend}</div>`;
+  }
+  box.innerHTML = html;
+}
+
 function renderDashboard(report, reportId) {
   document.getElementById("dash-empty").hidden = true;
   document.getElementById("dash-content").hidden = false;
@@ -66,19 +177,38 @@ function renderDashboard(report, reportId) {
     bar.hidden = true;
   }
 
+  renderOverview(report.stats && report.stats.overview);
+
+  // Only chart categories that actually have findings (score < 100); a wall of
+  // 100s is noise. Hide the chart entirely when everything is healthy.
   const cats = report.category_scores || {};
-  const labels = Object.keys(cats);
-  const data = labels.map((l) => cats[l]);
+  const problems = Object.entries(cats)
+    .filter(([, v]) => v < 100)
+    .sort((a, b) => a[1] - b[1]);
+  const wrap = document.getElementById("cat-wrap");
   const ctx = document.getElementById("cat-chart");
   if (catChart) catChart.destroy();
-  catChart = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{ label: "Category score", data, backgroundColor: "#6688cc" }],
-    },
-    options: { scales: { y: { min: 0, max: 100 } } },
-  });
+  if (!problems.length) {
+    wrap.hidden = true;
+  } else {
+    wrap.hidden = false;
+    const color = (v) => (v < 50 ? "#d12b2b" : v < 80 ? "#c47f00" : "#6688cc");
+    catChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: problems.map((p) => p[0]),
+        datasets: [
+          { label: "Category score", data: problems.map((p) => p[1]),
+            backgroundColor: problems.map((p) => color(p[1])) },
+        ],
+      },
+      options: {
+        indexAxis: "y",
+        scales: { x: { min: 0, max: 100 } },
+        plugins: { legend: { display: false } },
+      },
+    });
+  }
 
   const order = { critical: 0, warning: 1, info: 2 };
   const findings = [...report.findings].sort((a, b) => order[a.severity] - order[b.severity]);
@@ -92,6 +222,25 @@ function renderDashboard(report, reportId) {
     const id = document.createElement("div");
     id.className = "id";
     id.textContent = "[" + f.severity + "] " + f.id;
+    const mute = document.createElement("button");
+    mute.className = "mute-btn";
+    mute.textContent = "mute 24h";
+    mute.title = "Mute this finding for 24h (not scored)";
+    mute.addEventListener("click", async () => {
+      try {
+        await jpost("/api/suppressions", {
+          finding_id: f.id,
+          for_seconds: 86400,
+          affected: (f.affected || [])[0] || null,
+          target: report.target,
+          reason: "muted from dashboard",
+        });
+        div.remove();
+      } catch (err) {
+        alert("Could not mute: " + err.message);
+      }
+    });
+    id.appendChild(mute);
     div.appendChild(id);
     div.appendChild(title);
     if ((f.suggested_fixes || []).length || (f.suggested_checks || []).length) {
@@ -185,6 +334,47 @@ document.getElementById("schedule-form").addEventListener("submit", async (e) =>
     notify: document.getElementById("sched-notify").checked,
   });
   loadSchedules();
+});
+
+async function loadSuppressions() {
+  const tbody = document.querySelector("#suppress-table tbody");
+  tbody.innerHTML = "";
+  const rows = await jget("/api/suppressions");
+  for (const s of rows) {
+    const scope = [s.affected && `affected=${s.affected}`, s.target && `target=${s.target}`]
+      .filter(Boolean)
+      .join(" ");
+    const until = s.until.replace("T", " ").slice(0, 16);
+    const tr = document.createElement("tr");
+    if (!s.active) tr.style.opacity = "0.5";
+    tr.innerHTML =
+      `<td>${s.id}</td><td><code>${esc(s.finding_id)}</code></td>` +
+      `<td>${esc(scope)}</td><td>${esc(until)}${s.active ? "" : " (expired)"}</td>` +
+      `<td>${esc(s.reason || "")}</td>` +
+      `<td><button data-id="${s.id}">remove</button></td>`;
+    tr.querySelector("button").addEventListener("click", async () => {
+      await fetch("/api/suppressions/" + s.id, { method: "DELETE" });
+      loadSuppressions();
+    });
+    tbody.appendChild(tr);
+  }
+}
+document.getElementById("suppress-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const hours = parseInt(document.getElementById("sup-hours").value, 10) || 24;
+  try {
+    await jpost("/api/suppressions", {
+      finding_id: document.getElementById("sup-id").value.trim(),
+      affected: document.getElementById("sup-affected").value.trim() || null,
+      target: document.getElementById("sup-target").value.trim() || null,
+      for_seconds: hours * 3600,
+      reason: document.getElementById("sup-reason").value.trim(),
+    });
+    document.getElementById("sup-id").value = "";
+    loadSuppressions();
+  } catch (err) {
+    alert("Could not add: " + err.message);
+  }
 });
 
 async function loadFleet() {

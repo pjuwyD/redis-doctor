@@ -40,6 +40,7 @@ class Thresholds(BaseModel):
     idle_client_warning_count: int = 100
     idle_client_critical_count: int = 500
     blocked_client_warning: int = 1
+    blocked_client_critical: int = 100
     big_key_mb: float = 10
     huge_key_mb: float = 100
     large_collection: int = 10000
@@ -81,6 +82,11 @@ class HistoryConfig(BaseModel):
     path: str = "~/.redis-doctor/history.db"
 
 
+class SuppressConfig(BaseModel):
+    enabled: bool = True
+    path: str = "~/.redis-doctor/suppressions.db"
+
+
 class Config(BaseModel):
     connection: ConnectionConfig = Field(default_factory=ConnectionConfig)
     scan: ScanConfig = Field(default_factory=ScanConfig)
@@ -91,6 +97,7 @@ class Config(BaseModel):
     output: OutputConfig = Field(default_factory=OutputConfig)
     notify: NotifyConfig = Field(default_factory=NotifyConfig)
     history: HistoryConfig = Field(default_factory=HistoryConfig)
+    suppress: SuppressConfig = Field(default_factory=SuppressConfig)
 
 
 def _load_file(path: str) -> dict[str, Any]:

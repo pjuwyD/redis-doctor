@@ -15,16 +15,20 @@ stored report carries only the redacted target.
 
 The single-page app (vanilla JS + Chart.js, no build step) offers:
 
-- **Dashboard** — health-score, severity counts, category-score bars, and the
-  findings list with expand-for-detail. When the report is persisted (always, for
-  runs started from the GUI), an **Export: Markdown · PDF** bar links to the
-  download endpoints.
+- **Dashboard** — health-score, severity counts, an **Overview** (keys / streams /
+  scripts / clients with a client-state bar / memory / hit-rate / ops-sec), a
+  chart of only the categories that have findings, and the findings list with
+  expand-for-detail and a per-finding mute button. When the report is persisted
+  (always, for runs started from the GUI), an **Export: Markdown · PDF** bar links
+  to the download endpoints.
 - **Run** — enter a target and analyze live.
 - **Explore** — browse keys read-only with metadata + bounded preview, and a lock
   to unlock full value reads. See the [Explore guide](explore.md).
 - **History** — past reports (time, target, score, criticals); click to open, or
   use the per-row **MD** / **PDF** links to export.
 - **Diff** — pick two reports and see the [diff](../commands/diff.md).
+- **Suppressions** — list/add/remove muted findings; each Dashboard finding also
+  has a **mute 24h** button. See [`suppress`](../commands/suppress.md).
 - **Schedules** — create/list/delete cron schedules.
 - **Fleet** — score cards for the instances configured via `--fleet` (below).
 

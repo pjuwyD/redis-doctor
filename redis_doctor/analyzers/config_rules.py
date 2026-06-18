@@ -37,8 +37,6 @@ class ConfigAnalyzer(Analyzer):
         maxmemory = _int(values, "maxmemory")
         policy = values.get("maxmemory-policy", "noeviction")
         timeout = _int(values, "timeout")
-        appendonly = values.get("appendonly", "no")
-        save = values.get("save", "")
         keepalive = _int(values, "tcp-keepalive")
         slowlog_threshold = _int(values, "slowlog-log-slower-than", -1)
 
@@ -124,27 +122,8 @@ class ConfigAnalyzer(Analyzer):
                 )
             )
 
-        rdb_enabled = bool(save.strip())
-        aof_enabled = appendonly.lower() == "yes"
-        if not rdb_enabled and not aof_enabled:
-            findings.append(
-                Finding(
-                    id="config.no_persistence",
-                    severity=Severity.WARNING,
-                    category=Category.CONFIG,
-                    title="Neither RDB nor AOF persistence is enabled",
-                    explanation=(
-                        "With no persistence, all data is lost on restart. This is "
-                        "acceptable for a pure cache but risky for a datastore."
-                    ),
-                    evidence={"save": save, "appendonly": appendonly},
-                    suggested_checks=[
-                        "redis-cli CONFIG GET save",
-                        "redis-cli CONFIG GET appendonly",
-                    ],
-                    suggested_fixes=["Enable RDB snapshots and/or AOF if data matters"],
-                )
-            )
+        # "no persistence enabled" is reported once, by the persistence module
+        # (persistence.none_enabled), to avoid a duplicate finding.
 
         if slowlog_threshold < 0 or slowlog_threshold >= SLOWLOG_ABSURD_US:
             findings.append(

@@ -16,6 +16,7 @@
       <button data-view="explore">Explore</button>
       <button data-view="history">History</button>
       <button data-view="diff">Diff</button>
+      <button data-view="suppressions">Suppressions</button>
       <button data-view="schedules">Schedules</button>
       <button data-view="fleet">Fleet</button>
     </nav>
@@ -69,8 +70,12 @@
           <a id="exp-md" target="_blank" rel="noopener">Markdown</a> ·
           <a id="exp-pdf" target="_blank" rel="noopener">PDF</a>
         </div>
-        <canvas id="cat-chart" height="120"></canvas>
-        <h3>Findings</h3>
+        <div id="overview"></div>
+        <div id="cat-wrap">
+          <h3 class="section-h">Categories with findings</h3>
+          <canvas id="cat-chart" height="120"></canvas>
+        </div>
+        <h3 class="section-h">Findings</h3>
         <div id="findings"></div>
       </div>
     </section>
@@ -91,6 +96,26 @@
         <button type="submit">Compare</button>
       </form>
       <pre id="diff-output"></pre>
+    </section>
+
+    <section id="suppressions" class="view">
+      <h2>Suppressions</h2>
+      <p class="muted">
+        Mute a finding for a window without disabling its rule. Muted findings are
+        not scored and do not affect exit codes. You can also mute a finding from
+        the Dashboard.
+      </p>
+      <form id="suppress-form">
+        <input id="sup-id" type="text" placeholder="finding id e.g. memory.high_usage" size="26" />
+        <input id="sup-affected" type="text" placeholder="affected (optional)" size="18" />
+        <input id="sup-target" type="text" placeholder="target (optional)" size="18" />
+        <input id="sup-hours" type="number" value="24" min="1" title="hours" style="width:5rem" />
+        <input id="sup-reason" type="text" placeholder="reason (optional)" size="18" />
+        <button type="submit">Mute</button>
+      </form>
+      <table id="suppress-table"><thead><tr>
+        <th>ID</th><th>Finding</th><th>Scope</th><th>Until</th><th>Reason</th><th></th>
+      </tr></thead><tbody></tbody></table>
     </section>
 
     <section id="schedules" class="view">

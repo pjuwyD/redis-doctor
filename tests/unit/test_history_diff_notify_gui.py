@@ -197,7 +197,9 @@ def test_gui_analyze_persists_to_history(tmp_path, monkeypatch):
 
     # Avoid a real Redis: each run returns a synthetic report with a moving score.
     scores = iter([85, 60])
-    monkeypatch.setattr(srv, "analyze_target", lambda target, cfg: _report(score=next(scores)))
+    monkeypatch.setattr(
+        srv, "analyze_target", lambda target, cfg, suppressions=None: _report(score=next(scores))
+    )
 
     cfg = Config()  # history.enabled stays False — the GUI persists anyway
     cfg.history.path = str(tmp_path / "h.db")
@@ -246,7 +248,7 @@ def test_gui_analyze_connection_error_is_clean_json(tmp_path, monkeypatch):
     from redis_doctor.errors import ConnectionError as RDConnectionError
     from redis_doctor.gui import server as srv
 
-    def boom(target, cfg):
+    def boom(target, cfg, suppressions=None):
         raise RDConnectionError("Could not connect to redis://x/0: refused")
 
     monkeypatch.setattr(srv, "analyze_target", boom)

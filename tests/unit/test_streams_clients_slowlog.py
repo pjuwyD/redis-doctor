@@ -69,11 +69,14 @@ def test_clients_idle_many_and_unnamed(ctx):
     assert "clients.unnamed" in f
 
 
-def test_clients_blocked_critical(ctx):
+def test_clients_module_does_not_emit_blocked_or_maxclients(ctx):
+    # Blocked-clients and near-maxclients are reported by the server module only,
+    # to avoid duplicate findings.
     ctx.collected["clients"] = [ClientInfo(addr="10.0.0.1:1", name="svc")]
-    ctx.collected["info"] = ServerInfo(blocked_clients=12)
+    ctx.collected["info"] = ServerInfo(blocked_clients=12, connected_clients=1, maxclients=2)
     f = _ids(ClientAnalyzer().analyze(ctx))
-    assert f["clients.blocked"].severity == Severity.CRITICAL
+    assert "clients.blocked" not in f
+    assert "clients.near_maxclients" not in f
 
 
 def test_clients_same_ip_many(ctx):

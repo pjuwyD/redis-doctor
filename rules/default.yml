@@ -15,7 +15,6 @@ rules:
 
   # memory
   memory.high_usage: { enabled: true, warning_pct: 80, critical_pct: 90 }
-  memory.no_maxmemory: { enabled: true }
   memory.high_usage_noeviction: { enabled: true, usage_pct: 85 }
   memory.high_fragmentation: { enabled: true, warning_ratio: 1.5 }
   memory.rss_overhead: { enabled: true }
@@ -52,8 +51,6 @@ rules:
   streams.no_groups: { enabled: true }
 
   # clients
-  clients.near_maxclients: { enabled: true }
-  clients.blocked: { enabled: true }
   clients.idle_many: { enabled: true, idle_seconds: 3600, warning_count: 100, critical_count: 500 }
   clients.output_buffer_large: { enabled: true }
   clients.unnamed: { enabled: true }
@@ -81,7 +78,6 @@ rules:
   config.risky_eviction_policy: { enabled: true }
   config.timeout_zero_with_idle: { enabled: true }
   config.tcp_keepalive_bad: { enabled: true }
-  config.no_persistence: { enabled: true }
   config.slowlog_disabled: { enabled: true }
 
   # persistence

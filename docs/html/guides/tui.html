@@ -30,6 +30,7 @@
 <li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
 <li><a href="../commands/report.html">report</a></li>
 <li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../commands/suppress.html">suppress</a></li>
 <li><a href="../configuration.html">Configuration</a></li>
 <li><a href="../findings-catalog.html">Findings catalog</a></li>
 <li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
@@ -68,7 +69,7 @@ Config     - config + persistence risk findings
 Replication- role + replica topology
 Sentinel   - Sentinel topology (when connected via Sentinel)</code></pre>
 <h2 id="key-bindings">Key bindings<a class="anchor" href="#key-bindings">#</a></h2>
-<table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td>arrows / mouse</td><td>switch panels via the sidebar</td></tr><tr><td><code>e</code></td><td>expand the selected view&#x27;s findings to show evidence, checks, and fixes</td></tr><tr><td><code>f</code></td><td>cycle the severity filter: all → critical → warning</td></tr><tr><td><code>r</code></td><td>re-run the full analysis and refresh every panel</td></tr><tr><td><code>s</code></td><td>save the current report to JSON (prompts for a path)</td></tr><tr><td><code>q</code></td><td>quit</td></tr></tbody></table>
+<div class="table-wrap"><table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td>arrows / mouse</td><td>switch panels via the sidebar</td></tr><tr><td><code>e</code></td><td>expand the selected view&#x27;s findings to show evidence, checks, and fixes</td></tr><tr><td><code>f</code></td><td>cycle the severity filter: all → critical → warning</td></tr><tr><td><code>r</code></td><td>re-run the full analysis and refresh every panel</td></tr><tr><td><code>s</code></td><td>save the current report to JSON (prompts for a path)</td></tr><tr><td><code>q</code></td><td>quit</td></tr></tbody></table></div>
 <p>The analysis runs in a background worker so the UI stays responsive, and a render error in one panel never tears down the app.</p>
 <div class="pager">
 <a class="prev" href="explore.html">← Explore</a>

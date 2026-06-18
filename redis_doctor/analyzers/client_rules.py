@@ -11,7 +11,6 @@ from .base import Analyzer
 if TYPE_CHECKING:
     from ..pipeline import RunContext
 
-NEAR_MAXCLIENTS_SHARE = 0.9
 OUTPUT_BUFFER_LARGE = 10 * 1024 * 1024
 UNNAMED_SHARE = 0.8
 UNNAMED_MIN_CLIENTS = 20
@@ -32,44 +31,15 @@ class ClientAnalyzer(Analyzer):
             return []
 
         th = ctx.config.thresholds
-        info = ctx.collected.get("info")
         findings: list[Finding] = []
         total = len(clients)
         if total == 0:
             return []
 
-        maxclients = info.maxclients if info else 0
-        if maxclients and total >= NEAR_MAXCLIENTS_SHARE * maxclients:
-            findings.append(
-                Finding(
-                    id="clients.near_maxclients",
-                    severity=Severity.CRITICAL,
-                    category=Category.CLIENTS,
-                    title=f"Connected clients ({total}) are near maxclients ({maxclients})",
-                    explanation="When maxclients is reached, new connections are rejected.",
-                    evidence={"connected": total, "maxclients": maxclients},
-                    suggested_checks=["redis-cli INFO clients"],
-                    suggested_fixes=["Investigate connection leaks", "Raise maxclients"],
-                )
-            )
-
-        blocked = info.blocked_clients if info else 0
-        if blocked > th.blocked_client_warning:
-            findings.append(
-                Finding(
-                    id="clients.blocked",
-                    severity=Severity.CRITICAL,
-                    category=Category.CLIENTS,
-                    title=f"{blocked} clients are blocked",
-                    explanation=(
-                        "A large number of blocked clients can indicate a stalled queue "
-                        "or consumers stuck on blocking commands."
-                    ),
-                    evidence={"blocked_clients": blocked},
-                    suggested_checks=["redis-cli CLIENT LIST"],
-                    suggested_fixes=["Inspect blocking commands and their producers"],
-                )
-            )
+        # Note: connections-near-maxclients and blocked-clients are reported by the
+        # server module (server.high_client_count / server.blocked_clients) from
+        # INFO, to avoid duplicate findings. This module covers the per-connection
+        # details instead.
 
         idle = [c for c in clients if c.idle_seconds >= th.idle_client_warning_seconds]
         if len(idle) >= th.idle_client_critical_count:

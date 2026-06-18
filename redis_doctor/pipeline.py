@@ -142,6 +142,7 @@ def run_pipeline(
     only: list[str] | None = None,
     skip: list[str] | None = None,
     disable_dependencies: bool = False,
+    suppressions: list | None = None,
 ) -> Report:
     start = time.monotonic()
     engine = RuleEngine.from_config(config)
@@ -168,11 +169,14 @@ def run_pipeline(
 
     findings = [f for f in findings if engine.is_active(f.id)]
 
+    target = redis.target.redacted_url()
+    findings, suppressed = _apply_suppressions(findings, target, suppressions)
+
     server: ServerInfo = ctx.collected.get("info") or ServerInfo()
     duration = time.monotonic() - start
 
     return Report(
-        target=redis.target.redacted_url(),
+        target=target,
         generated_at=datetime.now(UTC),
         redis_doctor_version=__version__,
         duration_seconds=round(duration, 3),
@@ -182,9 +186,25 @@ def run_pipeline(
         summary=_summarize(findings),
         server=server,
         findings=findings,
+        suppressed=suppressed,
         skipped=ctx.skipped,
         stats=_build_stats(ctx),
     )
+
+
+def _apply_suppressions(
+    findings: list[Finding], target: str, suppressions: list | None
+) -> tuple[list[Finding], list[Finding]]:
+    """Split findings into (kept, suppressed) by active suppressions."""
+    if not suppressions:
+        return findings, []
+    from .suppress import matches_any
+
+    kept: list[Finding] = []
+    suppressed: list[Finding] = []
+    for f in findings:
+        (suppressed if matches_any(f, target, suppressions) else kept).append(f)
+    return kept, suppressed
 
 
 def build_report(
@@ -310,6 +330,8 @@ def _build_stats(ctx: RunContext) -> dict[str, Any]:
             "avg_duration_us": int(sum(durations) / len(durations)) if durations else 0,
             "command_frequency": dict(cmd_freq.most_common(10)),
         }
+
+    stats["overview"] = _build_overview(ctx, info)
     return stats
 
 
@@ -325,5 +347,121 @@ def _client_stats(clients: list, info: ServerInfo | None) -> dict[str, Any]:
         "blocked": info.blocked_clients if info else 0,
         "unnamed": unnamed,
         "idle_over_1h": idle_1h,
+        "states": client_states(clients),
         "top_commands": dict(by_command.most_common(5)),
     }
+
+
+# Output buffer above which a client is considered a slow consumer.
+_SLOW_CONSUMER_BYTES = 1024 * 1024
+# Idle seconds above which a connection is counted as "idle" (vs active).
+_IDLE_STATE_SECONDS = 60
+
+
+def client_states(clients: list) -> dict[str, int]:
+    """Application-level connection-state breakdown from CLIENT LIST.
+
+    These are Redis's view of each connection, not kernel TCP states (Redis does
+    not expose TCP states). Each client is bucketed once, by priority.
+    """
+    states: dict[str, int] = {}
+
+    def bump(name: str) -> None:
+        states[name] = states.get(name, 0) + 1
+
+    for c in clients:
+        flags = c.flags or ""
+        if "S" in flags or "M" in flags:
+            bump("replica_link")
+        elif "O" in flags:
+            bump("monitor")
+        elif "b" in flags:
+            bump("blocked")
+        elif "A" in flags or "c" in flags:
+            bump("closing")
+        elif (c.output_buffer or 0) >= _SLOW_CONSUMER_BYTES:
+            bump("slow_consumer")
+        elif "P" in flags:
+            bump("pubsub")
+        elif c.idle_seconds >= _IDLE_STATE_SECONDS:
+            bump("idle")
+        else:
+            bump("active")
+    return states
+
+
+def _build_overview(ctx: RunContext, info: ServerInfo | None) -> dict[str, Any]:
+    """A consistent at-a-glance summary consumed by the CLI, TUI, and GUI."""
+    ov: dict[str, Any] = {}
+
+    if info is not None:
+        hits, misses = info.keyspace_hits, info.keyspace_misses
+        ov["server"] = {
+            "redis_version": info.redis_version,
+            "role": info.role,
+            "mode": info.redis_mode,
+            "uptime_seconds": info.uptime_seconds,
+            "ops_per_sec": info.instantaneous_ops_per_sec,
+            "hit_rate": round(100 * hits / (hits + misses), 1) if (hits + misses) else None,
+            "evicted_keys": info.evicted_keys,
+            "expired_keys": info.expired_keys,
+        }
+        ov["memory"] = {
+            "used_bytes": info.used_memory_bytes,
+            "max_bytes": info.maxmemory_bytes,
+            "policy": info.maxmemory_policy,
+            "fragmentation": info.mem_fragmentation_ratio,
+            "pct": round(100 * info.used_memory_bytes / info.maxmemory_bytes, 1)
+            if info.maxmemory_bytes
+            else None,
+        }
+
+    keyspace = ctx.collected.get("keyspace")
+    if keyspace is not None:
+        ov["keys"] = {
+            "total": keyspace.dbsize,
+            "sampled": keyspace.sample.scanned,
+            "complete": keyspace.sample.complete,
+            "by_type": keyspace.type_distribution,
+        }
+    elif info is not None:
+        ov["keys"] = {"total": info.total_keys, "sampled": 0, "complete": True, "by_type": {}}
+
+    streams = ctx.collected.get("streams")
+    if streams is not None:
+        ov["streams"] = {
+            "count": len(streams),
+            "total_pending": sum(g.pending for st in streams for g in st.groups),
+        }
+
+    scripting = ctx.collected.get("scripting")
+    if scripting is not None:
+        ov["scripting"] = {
+            "cached_scripts": scripting.get("cached_scripts", 0),
+            "functions": scripting.get("functions_count", 0),
+            "libraries": scripting.get("libraries_count", 0),
+        }
+
+    clients = ctx.collected.get("clients")
+    if clients is not None:
+        ov["clients"] = {
+            "total": len(clients),
+            "blocked": info.blocked_clients if info else 0,
+            "maxclients": info.maxclients if info else 0,
+            "idle_over_1h": sum(1 for c in clients if c.idle_seconds >= 3600),
+            "unnamed": sum(1 for c in clients if not c.name),
+            "states": client_states(clients),
+        }
+    elif info is not None:
+        ov["clients"] = {
+            "total": info.connected_clients,
+            "blocked": info.blocked_clients,
+            "maxclients": info.maxclients,
+            "states": {},
+        }
+
+    slowlog = ctx.collected.get("slowlog")
+    if slowlog:
+        ov["slowlog"] = {"length": slowlog.get("length", 0)}
+
+    return ov

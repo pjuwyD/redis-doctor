@@ -52,18 +52,29 @@ class KeyRequest(BaseModel):
     full: bool = False
 
 
-def analyze_target(target_url: str, config: Config) -> Report:
+class SuppressRequest(BaseModel):
+    finding_id: str
+    for_seconds: int = 86400
+    affected: str | None = None
+    target: str | None = None
+    reason: str = ""
+
+
+def analyze_target(target_url: str, config: Config, suppressions: list | None = None) -> Report:
     target = parse_target(target_url)
     safe = connect(target)
     try:
-        return run_pipeline(safe, config)
+        return run_pipeline(safe, config, suppressions=suppressions)
     finally:
         safe.close()
 
 
 def create_app(config: Config | None = None, fleet: list[dict] | None = None) -> FastAPI:
+    from ..suppress import SuppressionStore
+
     cfg = config or Config()
     store = HistoryStore(cfg.history.path)
+    suppress_store = SuppressionStore(cfg.suppress.path)
     app = FastAPI(title="redis-doctor")
     schedules: dict[str, dict] = {}
     scheduler = _make_scheduler()
@@ -75,7 +86,7 @@ def create_app(config: Config | None = None, fleet: list[dict] | None = None) ->
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     def _run_and_store(target: str, do_notify: bool) -> Report:
-        report = analyze_target(target, cfg)
+        report = analyze_target(target, cfg, suppress_store.active())
         store.save(report)
         if do_notify:
             from ..notify import notify as send_notify
@@ -85,7 +96,7 @@ def create_app(config: Config | None = None, fleet: list[dict] | None = None) ->
 
     @app.post("/api/analyze")
     def api_analyze(req: AnalyzeRequest):
-        report = analyze_target(req.target, cfg)
+        report = analyze_target(req.target, cfg, suppress_store.active())
         # The dashboard's History and Diff views depend on persisted runs, so the
         # GUI always records to history (unlike the CLI, which honors
         # history.enabled). Only the redacted target is stored.
@@ -209,6 +220,30 @@ def create_app(config: Config | None = None, fleet: list[dict] | None = None) ->
             return function_overview(safe, full=req.full)
         finally:
             safe.close()
+
+    @app.get("/api/suppressions")
+    def api_suppressions():
+        return [
+            s.model_dump(mode="json") | {"active": s.is_active()} for s in suppress_store.list()
+        ]
+
+    @app.post("/api/suppressions")
+    def api_suppress_create(req: SuppressRequest):
+        from datetime import UTC, datetime, timedelta
+
+        until = datetime.now(UTC) + timedelta(seconds=max(1, req.for_seconds))
+        s = suppress_store.add(
+            req.finding_id,
+            until,
+            affected=req.affected,
+            target=req.target,
+            reason=req.reason,
+        )
+        return s.model_dump(mode="json")
+
+    @app.delete("/api/suppressions/{suppression_id}")
+    def api_suppress_delete(suppression_id: int):
+        return {"deleted": suppress_store.remove(suppression_id), "id": suppression_id}
 
     @app.get("/", response_class=HTMLResponse)
     def index():

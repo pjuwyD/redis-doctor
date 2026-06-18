@@ -30,6 +30,7 @@
 <li><a href="commands/analyze-cluster.html">analyze-cluster</a></li>
 <li><a href="commands/report.html">report</a></li>
 <li><a href="commands/diff.html">diff</a></li>
+<li><a href="commands/suppress.html">suppress</a></li>
 <li><a class="active" href="configuration.html">Configuration</a></li>
 <li><a href="findings-catalog.html">Findings catalog</a></li>
 <li><a href="output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
@@ -56,7 +57,7 @@
 <ol><li><strong>Built-in defaults</strong></li><li><strong>A config file</strong> (<code>--config redis-doctor.yml</code> or <code>REDIS_DOCTOR_CONFIG</code>)</li><li><strong>Environment variables</strong></li><li><strong>CLI flags</strong></li></ol>
 <p>A flag always wins over the file; the file always wins over the defaults.</p>
 <h2 id="environment-variables">Environment variables<a class="anchor" href="#environment-variables">#</a></h2>
-<table><thead><tr><th>Variable</th><th>Purpose</th></tr></thead><tbody><tr><td><code>REDIS_DOCTOR_PASSWORD</code></td><td>password used if <code>--password</code> is not given</td></tr><tr><td><code>REDIS_DOCTOR_USERNAME</code></td><td>username used if <code>--username</code> is not given</td></tr><tr><td><code>REDIS_DOCTOR_CONFIG</code></td><td>path to a config file if <code>--config</code> is not given</td></tr></tbody></table>
+<div class="table-wrap"><table><thead><tr><th>Variable</th><th>Purpose</th></tr></thead><tbody><tr><td><code>REDIS_DOCTOR_PASSWORD</code></td><td>password used if <code>--password</code> is not given</td></tr><tr><td><code>REDIS_DOCTOR_USERNAME</code></td><td>username used if <code>--username</code> is not given</td></tr><tr><td><code>REDIS_DOCTOR_CONFIG</code></td><td>path to a config file if <code>--config</code> is not given</td></tr></tbody></table></div>
 <p>SMTP settings for the email notifier are also read from the environment: <code>REDIS_DOCTOR_SMTP_HOST</code>, <code>REDIS_DOCTOR_SMTP_PORT</code>, <code>REDIS_DOCTOR_SMTP_FROM</code>.</p>
 <h2 id="full-config-file-schema">Full config file schema<a class="anchor" href="#full-config-file-schema">#</a></h2>
 <pre><code class="language-yaml">connection:
@@ -125,7 +126,13 @@ notify:
 
 history:
   enabled: false
-  path: &quot;~/.redis-doctor/history.db&quot;</code></pre>
+  path: &quot;~/.redis-doctor/history.db&quot;
+
+suppress:
+  enabled: true
+  path: &quot;~/.redis-doctor/suppressions.db&quot;</code></pre>
+<h2 id="suppressions-vs-ignore">Suppressions vs. ignore<a class="anchor" href="#suppressions-vs-ignore">#</a></h2>
+<p><code>ignore.rules</code> disables a rule <strong>permanently and globally</strong>. A <strong>suppression</strong> (see <a href="commands/suppress.html"><code>suppress</code></a>) mutes a finding <strong>temporarily</strong> (and optionally scoped to one affected item or target), then it reappears. Suppressed findings are excluded from the score and exit code but reported separately. Set <code>suppress.enabled: false</code> to ignore the store entirely.</p>
 <p>A ready-to-edit copy ships as <code>redis-doctor.example.yml</code>.</p>
 <h2 id="scan-sampling">Scan / sampling<a class="anchor" href="#scan-sampling">#</a></h2>
 <p>The keyspace is <strong>never fully scanned by default</strong>. Sampling stops as soon as any limit is hit (<code>sample_size</code> reached or <code>max_seconds</code> elapsed). The report always states how many keys were scanned, the estimated total, and a confidence level. See the <a href="developer/collectors.html#keyspace-sampler">keyspace sampler internals</a>.</p>
@@ -154,7 +161,7 @@ history:
 <h2 id="output-and-ci">Output and CI<a class="anchor" href="#output-and-ci">#</a></h2>
 <p><code>output.format</code> sets the default rendering and <code>output.fail_on</code> the default CI-gate behavior; both are overridden by <code>--format</code> and <code>--fail-on</code>. See <a href="output-and-exit-codes.html">Output &amp; exit codes</a>.</p>
 <div class="pager">
-<a class="prev" href="commands/diff.html">← diff</a>
+<a class="prev" href="commands/suppress.html">← suppress</a>
 <a class="next" href="findings-catalog.html">Findings catalog →</a>
 </div>
 <footer>Built from docs/md by docs/tools/converter.py</footer>

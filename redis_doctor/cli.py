@@ -162,6 +162,11 @@ def run_and_emit(
     resolved_fmt = fmt or cfg.output.format
     resolved_fail_on = fail_on or cfg.output.fail_on
     target = _resolve_target(**conn)
+    suppressions = None
+    if cfg.suppress.enabled:
+        from .suppress import load_active
+
+        suppressions = load_active(cfg.suppress.path)
     safe = connect(target)
     try:
         report = run_pipeline(
@@ -171,6 +176,7 @@ def run_and_emit(
             only=only,
             skip=skip,
             disable_dependencies=disable_dependencies,
+            suppressions=suppressions,
         )
     finally:
         safe.close()
@@ -744,6 +750,96 @@ def serve(
         fleet_targets = load_fleet(fleet) if fleet else None
         console.print(f"redis-doctor serving on http://{host}:{port}")
         run_server(host=host, port=port, config=cfg, fleet=fleet_targets)
+        return ExitCode.SUCCESS
+
+    _run(body)
+
+
+# --- suppress (acknowledge / mute findings) -------------------------------
+
+suppress_app = typer.Typer(help="Mute findings for a time window without disabling the rule.")
+app.add_typer(suppress_app, name="suppress")
+
+
+def _suppress_store(config: str | None):
+    from .suppress import SuppressionStore
+
+    return SuppressionStore(load_config(config).suppress.path)
+
+
+@suppress_app.command("add")
+def suppress_add(
+    finding_id: str = typer.Argument(..., help="finding id, e.g. memory.high_usage"),
+    for_: str = typer.Option("24h", "--for", help="duration: 30m, 24h, 7d, 2w"),
+    affected: str | None = typer.Option(None, "--affected", help="scope to one key/prefix/addr"),
+    target: str | None = typer.Option(None, "--target", help="scope to one redacted target"),
+    reason: str = typer.Option("", "--reason"),
+    config: str | None = typer.Option(None, "--config"),
+) -> None:
+    """Suppress a finding for a window (default 24h)."""
+
+    def body() -> int:
+        from datetime import UTC, datetime
+
+        from .suppress import parse_duration
+
+        until = datetime.now(UTC) + parse_duration(for_)
+        s = _suppress_store(config).add(
+            finding_id, until, affected=affected, target=target, reason=reason
+        )
+        console.print(
+            f"Suppressed [bold]{s.finding_id}[/bold]"
+            + (f" (affected={s.affected})" if s.affected else "")
+            + (f" (target={s.target})" if s.target else "")
+            + f" until {s.until:%Y-%m-%d %H:%M} UTC  [dim]#{s.id}[/dim]"
+        )
+        return ExitCode.SUCCESS
+
+    _run(body)
+
+
+@suppress_app.command("list")
+def suppress_list(
+    all_: bool = typer.Option(False, "--all", help="include expired entries"),
+    config: str | None = typer.Option(None, "--config"),
+) -> None:
+    """List suppressions (active only by default)."""
+
+    def body() -> int:
+        from datetime import UTC, datetime
+
+        rows = _suppress_store(config).list(active_only=not all_)
+        if not rows:
+            console.print("No suppressions.")
+            return ExitCode.SUCCESS
+        now = datetime.now(UTC)
+        for s in rows:
+            state = "active" if s.is_active(now) else "expired"
+            scope = []
+            if s.affected:
+                scope.append(f"affected={s.affected}")
+            if s.target:
+                scope.append(f"target={s.target}")
+            extra = ("  " + " ".join(scope)) if scope else ""
+            reason = f"  ({s.reason})" if s.reason else ""
+            console.print(
+                f"#{s.id}  {s.finding_id}  until {s.until:%Y-%m-%d %H:%M} [{state}]{extra}{reason}"
+            )
+        return ExitCode.SUCCESS
+
+    _run(body)
+
+
+@suppress_app.command("rm")
+def suppress_rm(
+    suppression_id: int = typer.Argument(..., help="suppression id (from `suppress list`)"),
+    config: str | None = typer.Option(None, "--config"),
+) -> None:
+    """Remove a suppression by id."""
+
+    def body() -> int:
+        ok = _suppress_store(config).remove(suppression_id)
+        console.print(f"Removed #{suppression_id}" if ok else f"No suppression #{suppression_id}")
         return ExitCode.SUCCESS
 
     _run(body)

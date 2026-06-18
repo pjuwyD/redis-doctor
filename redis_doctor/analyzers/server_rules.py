@@ -78,43 +78,72 @@ class ServerAnalyzer(Analyzer):
                 )
             )
 
-        if info.maxclients and info.connected_clients > 0.8 * info.maxclients:
-            findings.append(
-                Finding(
-                    id="server.high_client_count",
-                    severity=Severity.WARNING,
-                    category=Category.SERVER,
-                    title="Connected clients are near the maxclients limit",
-                    explanation=(
-                        "When connected clients reach maxclients, Redis rejects new "
-                        "connections, causing application errors."
-                    ),
-                    evidence={
-                        "connected_clients": info.connected_clients,
-                        "maxclients": info.maxclients,
-                    },
-                    suggested_checks=["redis-cli INFO clients", "redis-cli CONFIG GET maxclients"],
-                    suggested_fixes=[
-                        "Investigate connection leaks",
-                        "Use connection pooling",
-                        "Raise maxclients if the host can support it",
-                    ],
-                )
+        if info.maxclients:
+            share = info.connected_clients / info.maxclients
+            client_sev = (
+                Severity.CRITICAL
+                if share >= 0.95
+                else Severity.WARNING
+                if share >= 0.8
+                else None
             )
+            if client_sev is not None:
+                findings.append(
+                    Finding(
+                        id="server.high_client_count",
+                        severity=client_sev,
+                        category=Category.SERVER,
+                        title=(
+                            f"Connected clients are near the maxclients limit "
+                            f"({info.connected_clients}/{info.maxclients})"
+                        ),
+                        explanation=(
+                            "When connected clients reach maxclients, Redis rejects new "
+                            "connections, causing application errors."
+                        ),
+                        evidence={
+                            "connected_clients": info.connected_clients,
+                            "maxclients": info.maxclients,
+                        },
+                        suggested_checks=[
+                            "redis-cli INFO clients",
+                            "redis-cli CONFIG GET maxclients",
+                        ],
+                        suggested_fixes=[
+                            "Investigate connection leaks",
+                            "Use connection pooling",
+                            "Raise maxclients if the host can support it",
+                        ],
+                    )
+                )
 
-        if info.blocked_clients >= th.blocked_client_warning:
+        # Blocked clients are normal for queue/stream workloads (idle BLPOP/XREAD
+        # consumers count as blocked), so this only warns at the configured floor
+        # and escalates to critical when the count is genuinely high.
+        blocked_sev = (
+            Severity.CRITICAL
+            if info.blocked_clients >= th.blocked_client_critical
+            else Severity.WARNING
+            if info.blocked_clients >= th.blocked_client_warning
+            else None
+        )
+        if blocked_sev is not None:
             findings.append(
                 Finding(
                     id="server.blocked_clients",
-                    severity=Severity.WARNING,
+                    severity=blocked_sev,
                     category=Category.SERVER,
                     title=f"{info.blocked_clients} clients are blocked",
                     explanation=(
-                        "Blocked clients are waiting on BLPOP/BRPOP/XREAD-style "
-                        "commands; a persistently high count can indicate a stalled "
-                        "consumer or queue backup."
+                        "Blocked clients are waiting on BLPOP/BRPOP/XREAD-style commands. "
+                        "Some is normal for queue workloads; a high or growing count can "
+                        "indicate a stalled consumer or queue backup."
                     ),
-                    evidence={"blocked_clients": info.blocked_clients},
+                    evidence={
+                        "blocked_clients": info.blocked_clients,
+                        "warning_at": th.blocked_client_warning,
+                        "critical_at": th.blocked_client_critical,
+                    },
                     suggested_checks=["redis-cli INFO clients", "redis-cli CLIENT LIST"],
                     suggested_fixes=["Check consumers that issue blocking commands"],
                 )

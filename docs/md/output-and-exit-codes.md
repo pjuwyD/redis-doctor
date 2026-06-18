@@ -15,6 +15,21 @@ Choose with `--format` (or `output.format` in config). Write to a file with
 The `report` command re-renders a saved JSON report in any other format, and
 `diff` compares two JSON reports. See [Commands](commands/index.md).
 
+### Overview
+
+Every report includes an at-a-glance **Overview** (`stats.overview`) rendered
+identically by the CLI, TUI (Health panel), and GUI dashboard: total keys (with
+type distribution), streams (and total pending), cached scripts / Functions,
+clients (total / maxclients / blocked / unnamed) with a **client-state breakdown**,
+memory, throughput (ops/sec and hit rate), evictions, and slowlog length.
+
+The client-state breakdown (active / idle / blocked / closing / slow-consumer /
+pubsub / monitor / replica-link) is Redis's *application-level* view from
+`CLIENT LIST` — not kernel TCP states, which Redis does not expose.
+
+In the GUI, the category chart shows only categories that have findings (a wall of
+"100"s is noise); when everything is healthy the chart is hidden.
+
 ### JSON shape
 
 ```json
@@ -61,6 +76,13 @@ clamp to [0, 100]
 
 The same formula is applied per category to produce `category_scores`; a category
 with no findings scores 100.
+
+## Suppressed findings
+
+Findings muted with [`suppress`](commands/suppress.md) are removed from `findings`
+and listed under `suppressed` in the report. They do **not** count toward the
+health score, the severity summary, or the exit code, so a known issue can be
+acknowledged for a window without breaking a CI gate.
 
 ## Exit codes
 

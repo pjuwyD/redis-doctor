@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>suppress · Redis Doctor docs</title>
+<link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+<div class="brand">Redis Doctor</div>
+<span class="tag">documentation</span>
+<div class="sect">Overview</div><ul>
+<li><a href="../index.html">Redis Doctor</a></li>
+</ul>
+<div class="sect">Start here</div><ul>
+<li><a href="../getting-started.html">Getting started</a></li>
+<li><a href="../installation.html">Installation</a></li>
+<li><a href="../examples.html">Examples</a></li>
+</ul>
+<div class="sect">Reference</div><ul>
+<li><a href="index.html">Commands</a></li>
+<li><a href="analyze.html">analyze</a></li>
+<li><a href="scan-keys.html">scan-keys</a></li>
+<li><a href="inspect-stream.html">inspect-stream</a></li>
+<li><a href="inspect-clients.html">inspect-clients</a></li>
+<li><a href="config-check.html">config-check</a></li>
+<li><a href="analyze-sentinel.html">analyze-sentinel</a></li>
+<li><a href="analyze-cluster.html">analyze-cluster</a></li>
+<li><a href="report.html">report</a></li>
+<li><a href="diff.html">diff</a></li>
+<li><a class="active" href="suppress.html">suppress</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li><a href="../findings-catalog.html">Findings catalog</a></li>
+<li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
+<li><a href="../safety.html">Safety guardrails</a></li>
+</ul>
+<div class="sect">Guides</div><ul>
+<li><a href="../guides/explore.html">Explore</a></li>
+<li><a href="../guides/tui.html">Terminal UI</a></li>
+<li><a href="../guides/gui.html">Web dashboard</a></li>
+<li><a href="../guides/ci.html">CI integration</a></li>
+</ul>
+<div class="sect">Developer</div><ul>
+<li><a href="../developer/architecture.html">Architecture</a></li>
+<li><a href="../developer/collectors.html">Collectors</a></li>
+<li><a href="../developer/analyzers.html">Analyzers</a></li>
+<li><a href="../developer/rule-engine.html">Rule engine</a></li>
+<li><a href="../developer/adding-a-module.html">Adding a module</a></li>
+<li><a href="../developer/testing.html">Testing</a></li>
+</ul>
+</nav>
+<main><article>
+<h1 id="suppress">suppress<a class="anchor" href="#suppress">#</a></h1>
+<p>Mute a finding for a time window without permanently disabling its rule. Muted findings are <strong>not scored</strong> and do not affect exit codes; they reappear when the window expires.</p>
+<p>This differs from <code>ignore.rules</code> in <a href="../configuration.html">configuration</a>, which disables a rule permanently and globally. Suppression is a temporary acknowledgement (&quot;I know about this; hide it for 24h&quot;).</p>
+<pre><code class="language-bash">redis-doctor suppress add &lt;finding.id&gt; [--for 24h] [--affected X] [--target URL] [--reason &quot;...&quot;]
+redis-doctor suppress list [--all]
+redis-doctor suppress rm &lt;id&gt;</code></pre>
+<p>Suppressions are stored in a small SQLite database (default <code>~/.redis-doctor/suppressions.db</code>, set via <code>suppress.path</code>), so they apply to both the CLI and the <a href="../guides/gui.html">web dashboard</a> and survive restarts.</p>
+<h2 id="add">add<a class="anchor" href="#add">#</a></h2>
+<pre><code class="language-bash"># Mute a finding everywhere for 24h (the default window)
+redis-doctor suppress add server.blocked_clients --reason &quot;known BLPOP consumers&quot;
+
+# Mute for a week
+redis-doctor suppress add memory.high_fragmentation --for 7d
+
+# Scope to one key/prefix/address (only that affected item is muted)
+redis-doctor suppress add bigkey.big_memory --affected user:profile:123 --for 48h
+
+# Scope to a single instance (by its redacted target)
+redis-doctor suppress add config.no_persistence --target redis://cache-1:6379/0</code></pre>
+<p>Durations: <code>30m</code>, <code>24h</code>, <code>7d</code>, <code>2w</code>, <code>3600s</code>.</p>
+<p>Matching: a finding is muted when its <code>id</code> equals the suppression&#x27;s, and (if set) its <code>--affected</code> matches one of the finding&#x27;s affected items and its <code>--target</code> matches the report&#x27;s redacted target.</p>
+<h2 id="list">list<a class="anchor" href="#list">#</a></h2>
+<pre><code class="language-bash">redis-doctor suppress list          # active only
+redis-doctor suppress list --all    # include expired</code></pre>
+<h2 id="rm">rm<a class="anchor" href="#rm">#</a></h2>
+<pre><code class="language-bash">redis-doctor suppress rm 3          # remove suppression #3 (id from `list`)</code></pre>
+<h2 id="in-a-run">In a run<a class="anchor" href="#in-a-run">#</a></h2>
+<p>Active suppressions are applied automatically on every <code>analyze</code> (unless <code>suppress.enabled</code> is false). The terminal/JSON report lists muted findings separately so they stay visible:</p>
+<pre><code class="language-text">Suppressed: 1 finding(s) muted (not scored): server.blocked_clients</code></pre>
+<p>In the web dashboard, each finding has a <strong>mute 24h</strong> button, and the <strong>Suppressions</strong> tab lists and manages them.</p>
+<div class="pager">
+<a class="prev" href="diff.html">← diff</a>
+<a class="next" href="../configuration.html">Configuration →</a>
+</div>
+<footer>Built from docs/md by docs/tools/converter.py</footer>
+</article></main>
+</div>
+</body>
+</html>

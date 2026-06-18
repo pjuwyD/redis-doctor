@@ -30,6 +30,7 @@
 <li><a href="commands/analyze-cluster.html">analyze-cluster</a></li>
 <li><a href="commands/report.html">report</a></li>
 <li><a href="commands/diff.html">diff</a></li>
+<li><a href="commands/suppress.html">suppress</a></li>
 <li><a href="configuration.html">Configuration</a></li>
 <li><a href="findings-catalog.html">Findings catalog</a></li>
 <li><a href="output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
@@ -58,7 +59,7 @@
 pip install redis-doctor       # into the current environment</code></pre>
 <p>The console entry point is <code>redis-doctor</code> (also runnable as <code>python -m redis_doctor</code>).</p>
 <h2 id="extras">Extras<a class="anchor" href="#extras">#</a></h2>
-<table><thead><tr><th>Extra</th><th>Adds</th><th>Pulls in</th></tr></thead><tbody><tr><td><code>tui</code></td><td>the interactive <a href="guides/tui.html">terminal UI</a></td><td>Textual</td></tr><tr><td><code>gui</code></td><td>the <a href="guides/gui.html">web dashboard</a>, scheduling, PDF export</td><td>FastAPI, uvicorn, APScheduler, WeasyPrint</td></tr></tbody></table>
+<div class="table-wrap"><table><thead><tr><th>Extra</th><th>Adds</th><th>Pulls in</th></tr></thead><tbody><tr><td><code>tui</code></td><td>the interactive <a href="guides/tui.html">terminal UI</a></td><td>Textual</td></tr><tr><td><code>gui</code></td><td>the <a href="guides/gui.html">web dashboard</a>, scheduling, PDF export</td><td>FastAPI, uvicorn, APScheduler, WeasyPrint</td></tr></tbody></table></div>
 <pre><code class="language-bash">pip install &#x27;redis-doctor[tui]&#x27;
 pip install &#x27;redis-doctor[gui]&#x27;
 pip install &#x27;redis-doctor[tui,gui]&#x27;</code></pre>

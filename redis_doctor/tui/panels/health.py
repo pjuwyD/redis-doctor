@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from rich.console import Group, RenderableType
+from rich.rule import Rule
 from rich.text import Text
 
 from ...models.finding import Severity
 from ...models.report import Report
+from ...output.terminal import overview_table
 from . import build_panel
 
 
 def render(report: Report, severity_filter: Severity | None, expanded: bool) -> RenderableType:
     score = report.health_score
     style = "green" if score >= 80 else "yellow" if score >= 50 else "red"
-    header = Group(
+    parts: list[RenderableType] = [
         Text.assemble(("Health score: ", "bold"), (f"{score}/100", f"bold {style}")),
         Text(
             f"{report.summary.critical} critical   "
@@ -25,5 +27,9 @@ def render(report: Report, severity_filter: Severity | None, expanded: bool) -> 
             f"target {report.target}",
             style="dim",
         ),
-    )
-    return build_panel(report, "Health", None, severity_filter, expanded, header=header)
+    ]
+    table = overview_table(report.stats.get("overview"))
+    if table is not None:
+        parts.append(Rule(style="dim"))
+        parts.append(table)
+    return build_panel(report, "Health", None, severity_filter, expanded, header=Group(*parts))

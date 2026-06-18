@@ -40,3 +40,37 @@ def test_version_outdated_and_evictions(safe_fake):
     assert "server.evictions_occurring" in ids
     assert "server.blocked_clients" in ids
     assert "server.recent_restart" in ids
+
+
+def _server_ids(safe_fake, **info_kwargs):
+    from redis_doctor.analyzers.server_rules import ServerAnalyzer
+    from redis_doctor.models.server import ServerInfo
+    from redis_doctor.pipeline import RunContext
+
+    ctx = RunContext(redis=safe_fake, config=Config())
+    ctx.collected["info"] = ServerInfo(uptime_seconds=100000, **info_kwargs)
+    return {f.id: f for f in ServerAnalyzer().analyze(ctx)}
+
+
+def test_server_blocked_clients_severity_scales(safe_fake):
+    from redis_doctor.models.finding import Severity
+
+    assert "server.blocked_clients" not in _server_ids(safe_fake, blocked_clients=0)
+    assert _server_ids(safe_fake, blocked_clients=6)["server.blocked_clients"].severity == (
+        Severity.WARNING
+    )
+    assert _server_ids(safe_fake, blocked_clients=150)["server.blocked_clients"].severity == (
+        Severity.CRITICAL
+    )
+
+
+def test_server_high_client_count_scales(safe_fake):
+    from redis_doctor.models.finding import Severity
+
+    assert "server.high_client_count" not in _server_ids(
+        safe_fake, connected_clients=50, maxclients=100
+    )
+    warn = _server_ids(safe_fake, connected_clients=85, maxclients=100)
+    assert warn["server.high_client_count"].severity == Severity.WARNING
+    crit = _server_ids(safe_fake, connected_clients=98, maxclients=100)
+    assert crit["server.high_client_count"].severity == Severity.CRITICAL

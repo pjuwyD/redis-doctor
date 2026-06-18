@@ -14,6 +14,7 @@ Every subcommand. All commands that touch Redis accept the
 | [`analyze-cluster`](analyze-cluster.md) | Cluster diagnostic. |
 | [`report`](report.md) | Re-render a saved JSON report in another format. |
 | [`diff`](diff.md) | Diff two saved JSON reports. |
+| [`suppress`](suppress.md) | Mute findings for a window (add/list/rm). |
 | `tui` | Interactive terminal UI — see [the TUI guide](../guides/tui.md). |
 | `serve` | Web GUI + JSON API — see [the GUI guide](../guides/gui.md). |
 | `version` | Print the version. |

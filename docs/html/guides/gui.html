@@ -30,6 +30,7 @@
 <li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
 <li><a href="../commands/report.html">report</a></li>
 <li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../commands/suppress.html">suppress</a></li>
 <li><a href="../configuration.html">Configuration</a></li>
 <li><a href="../findings-catalog.html">Findings catalog</a></li>
 <li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
@@ -58,13 +59,15 @@ redis-doctor serve --host 127.0.0.1 --port 8787</code></pre>
 <p>It binds to <code>127.0.0.1</code> by default — <strong>no data leaves the machine</strong>. Passwords entered for a run are used only for that request and are never persisted; the stored report carries only the redacted target.</p>
 <h2 id="views">Views<a class="anchor" href="#views">#</a></h2>
 <p>The single-page app (vanilla JS + Chart.js, no build step) offers:</p>
-<ul><li><strong>Dashboard</strong> — health-score, severity counts, category-score bars, and the</li></ul>
-<p>findings list with expand-for-detail. When the report is persisted (always, for runs started from the GUI), an <strong>Export: Markdown · PDF</strong> bar links to the download endpoints.</p>
+<ul><li><strong>Dashboard</strong> — health-score, severity counts, an <strong>Overview</strong> (keys / streams /</li></ul>
+<p>scripts / clients with a client-state bar / memory / hit-rate / ops-sec), a chart of only the categories that have findings, and the findings list with expand-for-detail and a per-finding mute button. When the report is persisted (always, for runs started from the GUI), an <strong>Export: Markdown · PDF</strong> bar links to the download endpoints.</p>
 <ul><li><strong>Run</strong> — enter a target and analyze live.</li><li><strong>Explore</strong> — browse keys read-only with metadata + bounded preview, and a lock</li></ul>
 <p>to unlock full value reads. See the <a href="explore.html">Explore guide</a>.</p>
 <ul><li><strong>History</strong> — past reports (time, target, score, criticals); click to open, or</li></ul>
 <p>use the per-row <strong>MD</strong> / <strong>PDF</strong> links to export.</p>
-<ul><li><strong>Diff</strong> — pick two reports and see the <a href="../commands/diff.html">diff</a>.</li><li><strong>Schedules</strong> — create/list/delete cron schedules.</li><li><strong>Fleet</strong> — score cards for the instances configured via <code>--fleet</code> (below).</li></ul>
+<ul><li><strong>Diff</strong> — pick two reports and see the <a href="../commands/diff.html">diff</a>.</li><li><strong>Suppressions</strong> — list/add/remove muted findings; each Dashboard finding also</li></ul>
+<p>has a <strong>mute 24h</strong> button. See <a href="../commands/suppress.html"><code>suppress</code></a>.</p>
+<ul><li><strong>Schedules</strong> — create/list/delete cron schedules.</li><li><strong>Fleet</strong> — score cards for the instances configured via <code>--fleet</code> (below).</li></ul>
 <h2 id="json-api">JSON API<a class="anchor" href="#json-api">#</a></h2>
 <pre><code class="language-text">POST   /api/analyze      { target, options }        -&gt; Report JSON
 GET    /api/reports                                  -&gt; saved report metadata

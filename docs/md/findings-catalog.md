@@ -14,8 +14,8 @@ configuration; the triggers below describe the default behavior.
 | `server.version_outdated` | warning | major version < 7 |
 | `server.recent_restart` | info | uptime < 1h |
 | `server.role_unexpected` | info | role differs from `--expect-role` |
-| `server.high_client_count` | warning | connected clients > 80% of maxclients |
-| `server.blocked_clients` | warning | blocked clients ≥ threshold |
+| `server.high_client_count` | warning/critical | connected clients ≥ 80% / 95% of maxclients |
+| `server.blocked_clients` | warning/critical | blocked clients ≥ warning / critical threshold |
 | `server.evictions_occurring` | warning | evicted_keys > 0 |
 
 ## memory
@@ -23,7 +23,6 @@ configuration; the triggers below describe the default behavior.
 | ID | Severity | Trigger |
 |---|---|---|
 | `memory.high_usage` | warning/critical | used ≥ warning/critical pct of maxmemory |
-| `memory.no_maxmemory` | warning | maxmemory == 0 (unbounded) |
 | `memory.high_usage_noeviction` | critical | policy `noeviction` and usage ≥ 85% |
 | `memory.high_fragmentation` | warning | fragmentation ratio > threshold |
 | `memory.rss_overhead` | warning | RSS much larger than used memory |
@@ -78,8 +77,6 @@ configuration; the triggers below describe the default behavior.
 
 | ID | Severity | Trigger |
 |---|---|---|
-| `clients.near_maxclients` | critical | connected close to maxclients |
-| `clients.blocked` | critical | blocked clients > threshold |
 | `clients.idle_many` | warning/critical | idle count ≥ warning/critical count |
 | `clients.output_buffer_large` | critical | a client output buffer is very large |
 | `clients.unnamed` | warning | high share of clients with no name |
@@ -122,7 +119,6 @@ cache count and memory are available; Functions (Redis 7.0+) are listed by name.
 | `config.risky_eviction_policy` | warning | policy unsuited to workload |
 | `config.timeout_zero_with_idle` | warning | `timeout=0` with many idle clients |
 | `config.tcp_keepalive_bad` | info | keepalive disabled or very high |
-| `config.no_persistence` | warning | neither RDB nor AOF enabled |
 | `config.slowlog_disabled` | warning | slowlog disabled or threshold absurdly high |
 
 ## persistence

@@ -38,33 +38,22 @@ class MemoryAnalyzer(Analyzer):
         policy = stats.maxmemory_policy
         pct = (100 * used / maxmem) if maxmem else None
 
-        if maxmem == 0:
-            findings.append(
-                Finding(
-                    id="memory.no_maxmemory",
-                    severity=Severity.WARNING,
-                    category=Category.MEMORY,
-                    title="maxmemory is unset (memory is unbounded)",
-                    explanation=(
-                        "Without a maxmemory limit, Redis can consume all system "
-                        "memory and be killed by the OOM killer."
-                    ),
-                    evidence={"maxmemory": 0, "used_memory": used},
-                    suggested_checks=["redis-cli CONFIG GET maxmemory"],
-                    suggested_fixes=[
-                        "Set a maxmemory limit appropriate for the host",
-                        "Choose an eviction policy suited to the workload",
-                    ],
-                )
-            )
+        # "maxmemory unset" is reported once, by the config module
+        # (config.no_maxmemory), to avoid a duplicate finding.
 
-        if pct is not None:
+        # When the noeviction-specific critical fires it is strictly more
+        # informative, so the generic high_usage finding is skipped to avoid two
+        # criticals about the same metric.
+        noeviction_hit = policy == "noeviction" and pct is not None and pct >= NOEVICTION_USAGE_PCT
+
+        if pct is not None and not noeviction_hit:
             if pct >= critical_pct:
                 findings.append(self._high_usage(Severity.CRITICAL, pct, used, maxmem, policy))
             elif pct >= warning_pct:
                 findings.append(self._high_usage(Severity.WARNING, pct, used, maxmem, policy))
 
-            if policy == "noeviction" and pct >= NOEVICTION_USAGE_PCT:
+        if pct is not None:
+            if noeviction_hit:
                 findings.append(
                     Finding(
                         id="memory.high_usage_noeviction",

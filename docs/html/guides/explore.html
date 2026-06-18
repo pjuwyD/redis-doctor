@@ -30,6 +30,7 @@
 <li><a href="../commands/analyze-cluster.html">analyze-cluster</a></li>
 <li><a href="../commands/report.html">report</a></li>
 <li><a href="../commands/diff.html">diff</a></li>
+<li><a href="../commands/suppress.html">suppress</a></li>
 <li><a href="../configuration.html">Configuration</a></li>
 <li><a href="../findings-catalog.html">Findings catalog</a></li>
 <li><a href="../output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
@@ -54,7 +55,7 @@
 <h1 id="explore">Explore<a class="anchor" href="#explore">#</a></h1>
 <p>The Explore tab lets you <strong>browse a Redis keyspace read-only</strong> — list keys, see each key&#x27;s type/TTL/memory/size, and peek at contents — without giving up the tool&#x27;s safety guarantees. It is deliberately <em>not</em> a full data browser by default.</p>
 <p>There are two tiers, and a lock between them:</p>
-<table><thead><tr><th>Tier</th><th>Default</th><th>Reads</th><th>Commands</th></tr></thead><tbody><tr><td><strong>Metadata + bounded peek</strong></td><td>on</td><td>key metadata + a small, bounded sample of contents</td><td><code>SCAN</code>, <code>TYPE</code>, <code>TTL</code>, <code>MEMORY USAGE</code>, <code>HSCAN</code>/<code>SSCAN</code>/<code>ZSCAN</code> <code>COUNT n</code>, <code>XRANGE COUNT n</code>, <code>GETRANGE</code>, <code>LINDEX</code></td></tr><tr><td><strong>Full value read</strong></td><td><strong>locked</strong></td><td>the whole value (still capped)</td><td><code>GET</code>, <code>HGETALL</code>, <code>SMEMBERS</code>, <code>LRANGE</code>, <code>ZRANGE</code>, …</td></tr></tbody></table>
+<div class="table-wrap"><table><thead><tr><th>Tier</th><th>Default</th><th>Reads</th><th>Commands</th></tr></thead><tbody><tr><td><strong>Metadata + bounded peek</strong></td><td>on</td><td>key metadata + a small, bounded sample of contents</td><td><code>SCAN</code>, <code>TYPE</code>, <code>TTL</code>, <code>MEMORY USAGE</code>, <code>HSCAN</code>/<code>SSCAN</code>/<code>ZSCAN</code> <code>COUNT n</code>, <code>XRANGE COUNT n</code>, <code>GETRANGE</code>, <code>LINDEX</code></td></tr><tr><td><strong>Full value read</strong></td><td><strong>locked</strong></td><td>the whole value (still capped)</td><td><code>GET</code>, <code>HGETALL</code>, <code>SMEMBERS</code>, <code>LRANGE</code>, <code>ZRANGE</code>, …</td></tr></tbody></table></div>
 <p>The lock is enforced in the <a href="../safety.html">safety layer</a>, not just the UI: full-read commands belong to an &quot;expensive read&quot; tier that is refused unless the connection was opened with the unlock. So even a bug in the UI cannot pull full values while locked.</p>
 <h2 id="in-the-web-dashboard">In the web dashboard<a class="anchor" href="#in-the-web-dashboard">#</a></h2>
 <p>Open <code>serve</code> (<a href="gui.html">web dashboard</a>) and choose <strong>Explore</strong>:</p>

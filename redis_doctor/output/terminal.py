@@ -63,15 +63,6 @@ def _score_style(score: int) -> str:
     return "red"
 
 
-def _memory_line(report: Report) -> str:
-    s = report.server
-    used = human_bytes(s.used_memory_bytes)
-    if s.maxmemory_bytes:
-        pct = 100 * s.used_memory_bytes / s.maxmemory_bytes
-        return f"Memory: {used} / {human_bytes(s.maxmemory_bytes)} ({pct:.0f}%)"
-    return f"Memory: {used} / unbounded"
-
-
 def render(report: Report, console: Console | None = None) -> None:
     console = console or Console()
     s = report.server
@@ -84,19 +75,14 @@ def render(report: Report, console: Console | None = None) -> None:
     header.append(f"{report.health_score}/100", style=f"bold {_score_style(report.health_score)}")
     console.print(header)
 
-    summary = Text()
-    summary.append(
-        f"- Redis {s.redis_version}, role {s.role}, uptime {human_duration(s.uptime_seconds)}\n"
+    identity = Text()
+    identity.append(
+        f"Redis {s.redis_version} ({s.redis_mode}) · role {s.role} · "
+        f"uptime {human_duration(s.uptime_seconds)}"
     )
-    summary.append(f"- {_memory_line(report)}\n")
-    summary.append(f"- Clients: {s.connected_clients} connected, {s.blocked_clients} blocked\n")
-    summary.append(f"- Policy: {s.maxmemory_policy}\n")
-    if report.sampled:
-        summary.append(f"- Keys: {s.total_keys:,} (sampled)\n")
-    else:
-        summary.append(f"- Keys: {s.total_keys:,}\n")
-    console.print(Panel(summary, title="Summary", expand=False))
+    console.print(Panel(identity, title="Server", expand=False))
 
+    render_overview(report, console)
     render_keyspace(report, console)
     render_clients(report, console)
     render_streams(report, console)
@@ -119,10 +105,97 @@ def render(report: Report, console: Console | None = None) -> None:
             _render_finding(console, f)
         console.print()
 
+    if report.suppressed:
+        ids = ", ".join(sorted({f.id for f in report.suppressed}))
+        console.print(
+            f"[dim]Suppressed: {len(report.suppressed)} finding(s) muted (not scored): {ids}[/dim]"
+        )
+
     if report.skipped:
         console.print("[dim]Skipped:[/dim]")
         for sk in report.skipped:
             console.print(f"[dim]- {sk.module}: {sk.reason}[/dim]")
+
+
+def render_overview(report: Report, console: Console | None = None) -> None:
+    """At-a-glance totals shared with the TUI and GUI."""
+    console = console or Console()
+    table = overview_table(report.stats.get("overview"))
+    if table is not None:
+        console.print(table)
+        console.print()
+
+
+def overview_table(ov: dict | None) -> Table | None:
+    """Build the at-a-glance Overview table (reused by the terminal and TUI)."""
+    if not ov:
+        return None
+    table = Table(title="Overview", title_style="bold", expand=False, show_header=False, box=None)
+    table.add_column("Metric", style="dim", justify="right")
+    table.add_column("Value")
+
+    keys = ov.get("keys")
+    if keys:
+        dist = ", ".join(
+            f"{t} {c:,}" for t, c in sorted(keys["by_type"].items(), key=lambda x: -x[1])[:6]
+        )
+        sampled = "" if keys.get("complete") else f" (sampled {keys['sampled']:,})"
+        val = f"{keys['total']:,}{sampled}"
+        table.add_row("Keys", val + (f"   {dist}" if dist else ""))
+
+    streams = ov.get("streams")
+    if streams is not None:
+        table.add_row("Streams", f"{streams['count']:,}  ({streams['total_pending']:,} pending)")
+
+    scr = ov.get("scripting")
+    if scr is not None:
+        table.add_row(
+            "Scripts / Functions",
+            f"{scr['cached_scripts']:,} cached · {scr['functions']:,} functions "
+            f"in {scr['libraries']:,} lib(s)",
+        )
+
+    cl = ov.get("clients")
+    if cl:
+        head = f"{cl['total']:,}"
+        if cl.get("maxclients"):
+            head += f" / {cl['maxclients']:,}"
+        head += f" · {cl['blocked']} blocked"
+        if cl.get("unnamed"):
+            head += f" · {cl['unnamed']} unnamed"
+        table.add_row("Clients", head)
+        states = ", ".join(
+            f"{n.replace('_', ' ')} {v}"
+            for n, v in sorted((cl.get("states") or {}).items(), key=lambda x: -x[1])
+        )
+        if states:
+            table.add_row("Client states", states)
+
+    mem = ov.get("memory")
+    if mem:
+        if mem.get("pct") is not None:
+            line = (
+                f"{human_bytes(mem['used_bytes'])} / {human_bytes(mem['max_bytes'])} "
+                f"({mem['pct']:.0f}%) · {mem['policy']}"
+            )
+        else:
+            line = f"{human_bytes(mem['used_bytes'])} / unbounded · {mem['policy']}"
+        table.add_row("Memory", line)
+
+    srv = ov.get("server")
+    if srv:
+        thr = f"{srv['ops_per_sec']:,} ops/s"
+        if srv.get("hit_rate") is not None:
+            thr += f" · {srv['hit_rate']:.0f}% hit rate"
+        if srv.get("evicted_keys"):
+            thr += f" · {srv['evicted_keys']:,} evicted"
+        table.add_row("Throughput", thr)
+
+    sl = ov.get("slowlog")
+    if sl:
+        table.add_row("Slowlog", f"{sl['length']:,} entries")
+
+    return table
 
 
 def render_keyspace(report: Report, console: Console | None = None) -> None:

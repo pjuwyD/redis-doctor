@@ -90,7 +90,19 @@ notify:
 history:
   enabled: false
   path: "~/.redis-doctor/history.db"
+
+suppress:
+  enabled: true
+  path: "~/.redis-doctor/suppressions.db"
 ```
+
+## Suppressions vs. ignore
+
+`ignore.rules` disables a rule **permanently and globally**. A **suppression**
+(see [`suppress`](commands/suppress.md)) mutes a finding **temporarily** (and
+optionally scoped to one affected item or target), then it reappears. Suppressed
+findings are excluded from the score and exit code but reported separately. Set
+`suppress.enabled: false` to ignore the store entirely.
 
 A ready-to-edit copy ships as `redis-doctor.example.yml`.
 

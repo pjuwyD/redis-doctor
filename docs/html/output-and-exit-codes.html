@@ -30,6 +30,7 @@
 <li><a href="commands/analyze-cluster.html">analyze-cluster</a></li>
 <li><a href="commands/report.html">report</a></li>
 <li><a href="commands/diff.html">diff</a></li>
+<li><a href="commands/suppress.html">suppress</a></li>
 <li><a href="configuration.html">Configuration</a></li>
 <li><a href="findings-catalog.html">Findings catalog</a></li>
 <li><a class="active" href="output-and-exit-codes.html">Output formats &amp; exit codes</a></li>
@@ -54,8 +55,12 @@
 <h1 id="output-formats-exit-codes">Output formats &amp; exit codes<a class="anchor" href="#output-formats-exit-codes">#</a></h1>
 <h2 id="formats">Formats<a class="anchor" href="#formats">#</a></h2>
 <p>Choose with <code>--format</code> (or <code>output.format</code> in config). Write to a file with <code>--output &lt;path&gt;</code>; otherwise output goes to stdout.</p>
-<table><thead><tr><th>Format</th><th>Flag</th><th>Description</th></tr></thead><tbody><tr><td>Terminal</td><td><code>--format terminal</code> (default)</td><td>Rich, color-coded by severity, with summary, keyspace tables, and findings.</td></tr><tr><td>JSON</td><td><code>--format json</code></td><td>The full <code>Report</code> model. Stable schema — this is the automation contract.</td></tr><tr><td>Markdown</td><td><code>--format markdown</code></td><td>Summary, server info, findings with evidence/checks/fixes, raw stats appendix.</td></tr><tr><td>PDF</td><td>via <code>serve</code> <code>/api/export/{id}.pdf</code></td><td>Rendered from markdown with WeasyPrint.</td></tr></tbody></table>
+<div class="table-wrap"><table><thead><tr><th>Format</th><th>Flag</th><th>Description</th></tr></thead><tbody><tr><td>Terminal</td><td><code>--format terminal</code> (default)</td><td>Rich, color-coded by severity, with summary, keyspace tables, and findings.</td></tr><tr><td>JSON</td><td><code>--format json</code></td><td>The full <code>Report</code> model. Stable schema — this is the automation contract.</td></tr><tr><td>Markdown</td><td><code>--format markdown</code></td><td>Summary, server info, findings with evidence/checks/fixes, raw stats appendix.</td></tr><tr><td>PDF</td><td>via <code>serve</code> <code>/api/export/{id}.pdf</code></td><td>Rendered from markdown with WeasyPrint.</td></tr></tbody></table></div>
 <p>The <code>report</code> command re-renders a saved JSON report in any other format, and <code>diff</code> compares two JSON reports. See <a href="commands/index.html">Commands</a>.</p>
+<h3 id="overview">Overview<a class="anchor" href="#overview">#</a></h3>
+<p>Every report includes an at-a-glance <strong>Overview</strong> (<code>stats.overview</code>) rendered identically by the CLI, TUI (Health panel), and GUI dashboard: total keys (with type distribution), streams (and total pending), cached scripts / Functions, clients (total / maxclients / blocked / unnamed) with a <strong>client-state breakdown</strong>, memory, throughput (ops/sec and hit rate), evictions, and slowlog length.</p>
+<p>The client-state breakdown (active / idle / blocked / closing / slow-consumer / pubsub / monitor / replica-link) is Redis&#x27;s <em>application-level</em> view from <code>CLIENT LIST</code> — not kernel TCP states, which Redis does not expose.</p>
+<p>In the GUI, the category chart shows only categories that have findings (a wall of &quot;100&quot;s is noise); when everything is healthy the chart is hidden.</p>
 <h3 id="json-shape">JSON shape<a class="anchor" href="#json-shape">#</a></h3>
 <pre><code class="language-json">{
   &quot;target&quot;: &quot;redis://localhost:6379/0&quot;,
@@ -89,6 +94,8 @@ each warning finding:  -5
 each info finding:      0
 clamp to [0, 100]</code></pre>
 <p>The same formula is applied per category to produce <code>category_scores</code>; a category with no findings scores 100.</p>
+<h2 id="suppressed-findings">Suppressed findings<a class="anchor" href="#suppressed-findings">#</a></h2>
+<p>Findings muted with <a href="commands/suppress.html"><code>suppress</code></a> are removed from <code>findings</code> and listed under <code>suppressed</code> in the report. They do <strong>not</strong> count toward the health score, the severity summary, or the exit code, so a known issue can be acknowledged for a window without breaking a CI gate.</p>
 <h2 id="exit-codes">Exit codes<a class="anchor" href="#exit-codes">#</a></h2>
 <pre><code class="language-text">0 = success; no findings at or above the --fail-on threshold
 1 = findings at/above the warning threshold were present
@@ -97,7 +104,7 @@ clamp to [0, 100]</code></pre>
 4 = invalid config / invalid arguments
 5 = internal error</code></pre>
 <p><code>--fail-on</code> accepts <code>none</code> (default — always exit 0 on a successful run), <code>warning</code>, or <code>critical</code>. <code>--no-fail</code> forces exit 0 regardless of findings.</p>
-<table><thead><tr><th><code>--fail-on</code></th><th>criticals present</th><th>only warnings present</th><th>clean</th></tr></thead><tbody><tr><td><code>none</code></td><td>0</td><td>0</td><td>0</td></tr><tr><td><code>warning</code></td><td>2</td><td>1</td><td>0</td></tr><tr><td><code>critical</code></td><td>2</td><td>0</td><td>0</td></tr></tbody></table>
+<div class="table-wrap"><table><thead><tr><th><code>--fail-on</code></th><th>criticals present</th><th>only warnings present</th><th>clean</th></tr></thead><tbody><tr><td><code>none</code></td><td>0</td><td>0</td><td>0</td></tr><tr><td><code>warning</code></td><td>2</td><td>1</td><td>0</td></tr><tr><td><code>critical</code></td><td>2</td><td>0</td><td>0</td></tr></tbody></table></div>
 <p>This is the contract CI relies on — see <a href="guides/ci.html">CI integration</a>.</p>
 <h2 id="skipped-modules">Skipped modules<a class="anchor" href="#skipped-modules">#</a></h2>
 <p>When a command is unavailable (ACL restriction, old version, missing module) the analyzer records a <em>skipped module</em> note and the run continues. These appear under <code>skipped</code> in JSON and a &quot;Skipped&quot; section in the terminal output, e.g.:</p>

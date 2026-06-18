@@ -36,15 +36,19 @@ def test_memory_high_usage_noeviction_critical(ctx):
         used_memory=95, maxmemory=100, maxmemory_policy="noeviction"
     )
     findings = _by_id(MemoryAnalyzer().analyze(ctx))
-    assert "memory.high_usage_noeviction" in findings
     assert findings["memory.high_usage_noeviction"].severity == Severity.CRITICAL
-    assert findings["memory.high_usage"].severity == Severity.CRITICAL
+    # The generic high_usage finding is suppressed when the noeviction-specific
+    # critical fires (avoids two criticals about the same metric).
+    assert "memory.high_usage" not in findings
 
 
-def test_memory_no_maxmemory(ctx):
+def test_memory_no_maxmemory_is_reported_by_config_not_memory(ctx):
+    # The memory analyzer no longer emits a 'no maxmemory' finding (config does),
+    # so with maxmemory=0 it produces no usage findings.
     ctx.collected["memory"] = MemoryStats(used_memory=1000, maxmemory=0)
     findings = _by_id(MemoryAnalyzer().analyze(ctx))
-    assert "memory.no_maxmemory" in findings
+    assert "memory.no_maxmemory" not in findings
+    assert "memory.high_usage" not in findings
     assert "memory.high_usage_noeviction" not in findings
 
 

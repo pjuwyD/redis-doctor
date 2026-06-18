@@ -33,5 +33,6 @@ class Report(BaseModel):
     summary: ReportSummary = Field(default_factory=ReportSummary)
     server: ServerInfo = Field(default_factory=ServerInfo)
     findings: list[Finding] = Field(default_factory=list)
+    suppressed: list[Finding] = Field(default_factory=list)
     skipped: list[SkippedModule] = Field(default_factory=list)
     stats: dict[str, Any] = Field(default_factory=dict)
