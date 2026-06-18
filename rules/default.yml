@@ -1,0 +1,110 @@
+# Default rule pack for redis-doctor.
+# Every finding ID the tool can emit (Section 9) is listed here with its default
+# enabled state. A user config `rules:` block overrides any field per rule ID;
+# `ignore.rules` disables a rule entirely. Analyzers read thresholds via the rule
+# engine; global thresholds in `thresholds:` apply where a rule has no override.
+
+rules:
+  # server
+  server.version_outdated: { enabled: true }
+  server.recent_restart: { enabled: true }
+  server.role_unexpected: { enabled: true }
+  server.high_client_count: { enabled: true }
+  server.blocked_clients: { enabled: true }
+  server.evictions_occurring: { enabled: true }
+
+  # memory
+  memory.high_usage: { enabled: true, warning_pct: 80, critical_pct: 90 }
+  memory.no_maxmemory: { enabled: true }
+  memory.high_usage_noeviction: { enabled: true, usage_pct: 85 }
+  memory.high_fragmentation: { enabled: true, warning_ratio: 1.5 }
+  memory.rss_overhead: { enabled: true }
+
+  # keyspace
+  keyspace.dominant_prefix: { enabled: true }
+  keyspace.high_key_count: { enabled: true }
+
+  # ttl
+  ttl.locks_without_ttl: { enabled: true }
+  ttl.sessions_without_ttl: { enabled: true }
+  ttl.tokens_without_ttl: { enabled: true }
+  ttl.cache_permanent: { enabled: true }
+  ttl.excessive_ttl: { enabled: true }
+  ttl.inconsistent_within_prefix: { enabled: true }
+
+  # bigkey
+  bigkey.huge_memory: { enabled: true }
+  bigkey.big_memory: { enabled: true }
+  bigkey.huge_collection: { enabled: true }
+  bigkey.large_collection: { enabled: true }
+
+  # types
+  types.mixed_under_prefix: { enabled: true }
+  types.untrimmed_collections: { enabled: true }
+
+  # streams
+  streams.length_high: { enabled: true }
+  streams.pending_high: { enabled: true }
+  streams.idle_consumer_with_pending: { enabled: true }
+  streams.no_consumers: { enabled: true }
+  streams.lag_high: { enabled: true }
+  streams.many_inactive_consumers: { enabled: true }
+  streams.no_groups: { enabled: true }
+
+  # clients
+  clients.near_maxclients: { enabled: true }
+  clients.blocked: { enabled: true }
+  clients.idle_many: { enabled: true, idle_seconds: 3600, warning_count: 100, critical_count: 500 }
+  clients.output_buffer_large: { enabled: true }
+  clients.unnamed: { enabled: true }
+  clients.same_ip_many: { enabled: true }
+
+  # slowlog
+  slowlog.dangerous_command: { enabled: true }
+  slowlog.repeated_slow_command: { enabled: true }
+  slowlog.length_near_max: { enabled: true }
+
+  # latency
+  latency.spike: { enabled: true }
+  latency.fork_slow: { enabled: true }
+  latency.aof_fsync_slow: { enabled: true }
+
+  # config
+  config.no_maxmemory: { enabled: true }
+  config.risky_eviction_policy: { enabled: true }
+  config.timeout_zero_with_idle: { enabled: true }
+  config.tcp_keepalive_bad: { enabled: true }
+  config.no_persistence: { enabled: true }
+  config.slowlog_disabled: { enabled: true }
+
+  # persistence
+  persistence.rdb_failed: { enabled: true }
+  persistence.aof_failed: { enabled: true }
+  persistence.loading: { enabled: true }
+  persistence.none_enabled: { enabled: true }
+  persistence.last_save_old: { enabled: true }
+
+  # replication
+  replication.link_down: { enabled: true }
+  replication.lag_high: { enabled: true }
+  replication.no_replicas: { enabled: true }
+  replication.replica_writable: { enabled: true }
+
+  # security
+  security.no_auth: { enabled: true }
+  security.default_user: { enabled: true }
+  security.protected_mode_off: { enabled: true }
+
+  # sentinel
+  sentinel.insufficient_quorum: { enabled: true }
+  sentinel.replica_lag_high: { enabled: true }
+  sentinel.master_disagreement: { enabled: true }
+  sentinel.unreachable_replica: { enabled: true }
+  sentinel.failover_timeout_unusual: { enabled: true }
+
+  # cluster
+  cluster.uncovered_slots: { enabled: true }
+  cluster.failed_node: { enabled: true }
+  cluster.master_without_replica: { enabled: true }
+  cluster.uneven_keys: { enabled: true }
+  cluster.uneven_memory: { enabled: true }

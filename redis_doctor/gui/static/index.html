@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>redis-doctor</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header>
+    <h1>redis-doctor</h1>
+    <nav id="nav">
+      <button data-view="dashboard" class="active">Dashboard</button>
+      <button data-view="run">Run</button>
+      <button data-view="explore">Explore</button>
+      <button data-view="history">History</button>
+      <button data-view="diff">Diff</button>
+      <button data-view="schedules">Schedules</button>
+      <button data-view="fleet">Fleet</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="run" class="view">
+      <h2>Run analysis</h2>
+      <form id="run-form">
+        <input id="target" type="text" placeholder="redis://localhost:6379" size="40" />
+        <button type="submit">Analyze</button>
+      </form>
+      <p id="run-status"></p>
+    </section>
+
+    <section id="explore" class="view">
+      <h2>Explore</h2>
+      <p class="muted">
+        Browse keys read-only. By default you see metadata and a small bounded
+        preview. Unlock to read full values (heavier; off by default).
+      </p>
+      <form id="explore-form">
+        <input id="exp-target" type="text" placeholder="redis://localhost:6379" size="34" />
+        <input id="exp-match" type="text" placeholder="match e.g. session:*" size="22" />
+        <button type="submit">Scan</button>
+        <label class="lock">
+          <input id="exp-unlock" type="checkbox" />
+          <span id="exp-lock-label">🔒 full reads locked</span>
+        </label>
+      </form>
+      <p id="explore-status" class="muted"></p>
+      <div class="explore-grid">
+        <div id="explore-keys"></div>
+        <div id="explore-detail"></div>
+      </div>
+      <button id="explore-more" hidden>Load more</button>
+    </section>
+
+    <section id="dashboard" class="view active">
+      <div id="dash-empty">Run an analysis to see results.</div>
+      <div id="dash-content" hidden>
+        <div class="cards">
+          <div class="card"><div class="big" id="score">–</div><div>Health score</div></div>
+          <div class="card crit"><div class="big" id="c-crit">0</div><div>Critical</div></div>
+          <div class="card warn"><div class="big" id="c-warn">0</div><div>Warning</div></div>
+          <div class="card info"><div class="big" id="c-info">0</div><div>Info</div></div>
+        </div>
+        <div id="export-bar" class="export-bar" hidden>
+          Export:
+          <a id="exp-md" target="_blank" rel="noopener">Markdown</a> ·
+          <a id="exp-pdf" target="_blank" rel="noopener">PDF</a>
+        </div>
+        <canvas id="cat-chart" height="120"></canvas>
+        <h3>Findings</h3>
+        <div id="findings"></div>
+      </div>
+    </section>
+
+    <section id="history" class="view">
+      <h2>History</h2>
+      <button id="refresh-history">Refresh</button>
+      <table id="history-table"><thead><tr>
+        <th>ID</th><th>Time</th><th>Target</th><th>Score</th><th>Critical</th><th></th>
+      </tr></thead><tbody></tbody></table>
+    </section>
+
+    <section id="diff" class="view">
+      <h2>Diff</h2>
+      <form id="diff-form">
+        <input id="diff-before" type="number" placeholder="before id" />
+        <input id="diff-after" type="number" placeholder="after id" />
+        <button type="submit">Compare</button>
+      </form>
+      <pre id="diff-output"></pre>
+    </section>
+
+    <section id="schedules" class="view">
+      <h2>Schedules</h2>
+      <form id="schedule-form">
+        <input id="sched-target" type="text" placeholder="redis://localhost:6379" />
+        <input id="sched-cron" type="text" placeholder="0 * * * *" />
+        <label><input id="sched-notify" type="checkbox" /> notify</label>
+        <button type="submit">Create</button>
+      </form>
+      <table id="schedule-table"><thead><tr>
+        <th>ID</th><th>Target</th><th>Cron</th><th>Notify</th><th></th>
+      </tr></thead><tbody></tbody></table>
+    </section>
+
+    <section id="fleet" class="view">
+      <h2>Fleet</h2>
+      <div id="fleet-cards" class="cards"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

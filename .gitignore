@@ -1,0 +1,53 @@
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+*.whl
+pip-wheel-metadata/
+
+# ── Virtual environments ─────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Test / lint / type caches ────────────────────────────
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# ── Generated documentation (rebuild: docs/tools/converter.py) ──
+docs/html/
+
+# ── redis-doctor runtime / local artifacts ───────────────
+*.pdf
+.redis-doctor/
+# Local config may hold credentials; the committed example stays tracked.
+redis-doctor.yml
+fleet.yml
+
+# ── Secrets / local env ──────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Editors / OS ─────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# The build spec was written for the coding agent; remove this line to track it.
+redis-doctor.md

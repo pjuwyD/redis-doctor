@@ -1,0 +1,71 @@
+# Example redis-doctor configuration.
+# Resolution order: built-in defaults < this file < environment < CLI flags.
+# Pass with: redis-doctor analyze redis://host:6379 --config redis-doctor.yml
+
+connection:
+  timeout_seconds: 5
+
+scan:
+  sample_size: 10000
+  count: 1000
+  max_seconds: 30
+  prefix_depth: 2
+  prefix_separators: ":.|/_"
+
+thresholds:
+  memory_warning_pct: 80
+  memory_critical_pct: 90
+  fragmentation_warning_ratio: 1.5
+  idle_client_warning_seconds: 3600
+  idle_client_warning_count: 100
+  idle_client_critical_count: 500
+  blocked_client_warning: 1
+  big_key_mb: 10
+  huge_key_mb: 100
+  large_collection: 10000
+  huge_collection: 100000
+  stream_length_warning: 100000
+  stream_pending_warning: 10000
+  consumer_idle_warning_seconds: 3600
+  slowlog_max_entries: 128
+  replica_lag_warning_seconds: 30
+  replica_lag_critical_seconds: 120
+
+ttl_expectations:
+  - pattern: "session:*"
+    ttl_required: true
+    max_ttl_seconds: 86400
+  - pattern: "lock:*"
+    ttl_required: true
+    max_ttl_seconds: 300
+  - pattern: "cache:*"
+    ttl_required: true
+
+rules:
+  memory.high_usage:
+    enabled: true
+    warning_pct: 80
+    critical_pct: 90
+  clients.idle_many:
+    enabled: true
+    idle_seconds: 3600
+    warning_count: 100
+    critical_count: 500
+
+ignore:
+  keys:
+    - "metrics:*"
+  rules:
+    - "security.default_user"
+
+output:
+  format: terminal          # terminal | markdown | json
+  fail_on: none             # none | warning | critical
+
+notify:
+  slack_webhook_url: null
+  email: null
+
+history:
+  enabled: false
+  path: "~/.redis-doctor/history.db"
