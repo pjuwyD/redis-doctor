@@ -7,10 +7,15 @@
 <link rel="stylesheet" href="../assets/styles.css" />
 </head>
 <body>
+<input type="checkbox" id="nav-toggle" class="nav-toggle" hidden />
 <div class="layout">
 <nav class="side">
-<div class="brand">Redis Doctor</div>
+<div class="nav-head">
+<a class="brand" href="../index.html">Redis Doctor</a>
+<label for="nav-toggle" class="nav-burger" aria-label="Toggle navigation">☰ Menu</label>
+</div>
 <span class="tag">documentation</span>
+<div class="nav-links">
 <div class="sect">Overview</div><ul>
 <li><a href="../index.html">Redis Doctor</a></li>
 </ul>
@@ -50,6 +55,7 @@
 <li><a href="../developer/adding-a-module.html">Adding a module</a></li>
 <li><a href="../developer/testing.html">Testing</a></li>
 </ul>
+</div>
 </nav>
 <main><article>
 <h1 id="config-check">config-check<a class="anchor" href="#config-check">#</a></h1>

@@ -76,8 +76,12 @@ a:hover { text-decoration: underline; }
 nav.side { width: 270px; background: var(--side); color: var(--side-fg);
            padding: 1.2rem 1rem; flex-shrink: 0; overflow-y: auto;
            position: sticky; top: 0; height: 100vh; }
-nav.side .brand { color:#fff; font-weight:700; font-size:1.15rem; margin-bottom:.2rem; }
-nav.side .tag { color:#8b90a6; font-size:.8rem; margin-bottom:1rem; display:block; }
+.nav-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+nav.side a.brand { color:#fff; font-weight:700; font-size:1.15rem; text-decoration:none; }
+nav.side a.brand:hover { background:none; }
+.nav-burger { display:none; cursor:pointer; color:#fff; font-size:.9rem; user-select:none;
+              padding:.25rem .55rem; border:1px solid #3a3a52; border-radius:6px; }
+nav.side .tag { color:#8b90a6; font-size:.8rem; margin:.2rem 0 1rem; display:block; }
 nav.side .sect { color:#8b90a6; text-transform:uppercase; font-size:.72rem;
                  letter-spacing:.08em; margin:1rem 0 .35rem; }
 nav.side ul { list-style:none; margin:0; padding:0; }
@@ -114,13 +118,17 @@ hr { border:none; border-top:1px solid var(--border); margin:2rem 0; }
 .pager .next { margin-left:auto; text-align:right; }
 footer { color: var(--muted); font-size:.8rem; margin-top:2rem; }
 
-/* Mobile: stack the sidebar as a compact, scrollable strip above the content. */
+/* Mobile: collapse the sidebar into a compact top bar with a hamburger menu, so
+   each page opens at its content, not a wall of links. */
 @media (max-width: 820px) {
   .layout { display:block; }
-  nav.side { width:auto; height:auto; position:static; max-height:42vh; overflow-y:auto;
-             padding:.7rem .9rem; border-bottom:3px solid #2a2a40; }
-  nav.side .brand { font-size:1.05rem; }
-  nav.side .sect { margin:.7rem 0 .3rem; }
+  nav.side { width:auto; height:auto; position:static; padding:.6rem .9rem;
+             border-bottom:3px solid #2a2a40; }
+  nav.side .tag { display:none; }
+  nav.side a.brand { font-size:1.05rem; }
+  .nav-burger { display:inline-block; }
+  .nav-links { display:none; margin-top:.55rem; max-height:72vh; overflow-y:auto; }
+  #nav-toggle:checked ~ .layout .nav-links { display:block; }
   article { padding:1.1rem 1rem 3rem; }
   h1 { font-size:1.5rem; line-height:1.3; }
   h2 { font-size:1.18rem; }
@@ -137,11 +145,17 @@ PAGE = """<!DOCTYPE html>
 <link rel="stylesheet" href="{css_href}" />
 </head>
 <body>
+<input type="checkbox" id="nav-toggle" class="nav-toggle" hidden />
 <div class="layout">
 <nav class="side">
-<div class="brand">Redis Doctor</div>
+<div class="nav-head">
+<a class="brand" href="{home_href}">Redis Doctor</a>
+<label for="nav-toggle" class="nav-burger" aria-label="Toggle navigation">☰ Menu</label>
+</div>
 <span class="tag">documentation</span>
+<div class="nav-links">
 {nav}
+</div>
 </nav>
 <main><article>
 {body}
@@ -455,6 +469,7 @@ def build(src: Path, out: Path, clean: bool = False) -> int:
         html_doc = PAGE.format(
             title=html.escape(titles[rel]),
             css_href=css_href,
+            home_href=rel_href(rel, "index.html"),
             nav=nav,
             body=body,
             pager=pager,
