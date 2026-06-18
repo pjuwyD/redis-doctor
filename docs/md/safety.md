@@ -10,9 +10,9 @@ by accident.
 `PING`, `INFO`, `CONFIG GET`, `DBSIZE`, `CLIENT LIST`, `CLIENT INFO`,
 `SLOWLOG GET`, `SLOWLOG LEN`, `LATENCY LATEST`, `LATENCY DOCTOR`, `MEMORY STATS`,
 `MEMORY USAGE`, `SCAN`, `TYPE`, `TTL`, `PTTL`, `STRLEN`, `LLEN`, `SCARD`, `ZCARD`,
-`HLEN`, `XLEN`, `XINFO STREAM`, `XINFO GROUPS`, `XINFO CONSUMERS`, `ACL WHOAMI`,
-`ACL LIST` (redacted), read-only `SENTINEL` subcommands, read-only `CLUSTER`
-subcommands.
+`HLEN`, `XLEN`, `XINFO STREAM`, `XINFO GROUPS`, `XINFO CONSUMERS`, `SCRIPT EXISTS`,
+`FUNCTION LIST`, `FUNCTION STATS`, `ACL WHOAMI`, `ACL LIST` (redacted), read-only
+`SENTINEL` subcommands, read-only `CLUSTER` subcommands.
 
 ## Bounded reads (allowed by default)
 
@@ -38,7 +38,8 @@ reads. See the [Explore guide](guides/explore.md).
 ## Blocked unless `--allow-write` (no command path uses this)
 
 `FLUSHDB`, `FLUSHALL`, `CLIENT KILL`, `CONFIG SET`, `EVAL`, `EVALSHA`,
-`SCRIPT FLUSH`, `MEMORY PURGE`, `XTRIM`, `XGROUP DELCONSUMER`, `XAUTOCLAIM`, `DEL`,
+`SCRIPT LOAD/FLUSH/KILL`, `FUNCTION LOAD/DELETE/FLUSH`, `MEMORY PURGE`, `XTRIM`,
+`XGROUP DELCONSUMER`, `XAUTOCLAIM`, `DEL`,
 `EXPIRE`, and any other mutating command. Remediation suggestions may *name*
 commands like `XTRIM` or `XAUTOCLAIM`, but the tool never runs them.
 

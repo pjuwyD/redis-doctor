@@ -30,6 +30,7 @@ class Category(str, Enum):
     STREAMS = "streams"
     CLIENTS = "clients"
     SLOWLOG = "slowlog"
+    SCRIPTING = "scripting"
     LATENCY = "latency"
     CONFIG = "config"
     PERSISTENCE = "persistence"

@@ -14,6 +14,7 @@ All value-returning reads tolerate non-UTF-8 data (shown as a placeholder).
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .connection import SafeRedis
@@ -47,6 +48,151 @@ def _int_or_none(value: Any) -> int | None:
         return int(value)
     except (ValueError, TypeError):
         return None
+
+
+def _get(d: Any, *names, default=None):
+    if not isinstance(d, dict):
+        return default
+    for name in names:
+        if name in d:
+            return d[name]
+        b = name.encode()
+        if b in d:
+            return d[b]
+    return default
+
+
+def function_overview(safe: SafeRedis, full: bool = False) -> dict[str, Any]:
+    """Lua scripting + Functions overview for the Explore tab.
+
+    Legacy EVAL/EVALSHA scripts cannot be enumerated by Redis, so only the cache
+    count and memory are returned. Functions (Redis 7.0+) are listed by name;
+    their source code is included only when `full` is set, which requires an
+    unlocked connection (`allow_expensive`) — the same lock as full value reads.
+    """
+    if full and not safe.allow_expensive:
+        raise UnsafeCommandError("reading function source requires unlocking full value reads")
+
+    try:
+        info = safe.execute("INFO", "memory")
+        fields = info if isinstance(info, dict) else _parse_info_text(_s(info))
+    except Exception:
+        fields = {}
+    out: dict[str, Any] = {
+        "supported": False,
+        "full": full,
+        "cached_scripts": _intf(fields, "number_of_cached_scripts"),
+        "scripts_memory": _intf(fields, "used_memory_scripts") or _intf(fields, "used_memory_lua"),
+        "usage": _scripting_usage(safe),
+        "libraries": [],
+    }
+
+    try:
+        args = ("FUNCTION", "LIST", "WITHCODE") if full else ("FUNCTION", "LIST")
+        raw = safe.execute(*args)
+    except Exception:
+        return out  # FUNCTION unsupported (Redis < 7) — return the script summary only
+    out["supported"] = True
+
+    for lib in raw or []:
+        ld = {_s(k): v for k, v in lib.items()} if isinstance(lib, dict) else {}
+        funcs = []
+        for f in _get(ld, "functions") or []:
+            fd = {_s(k): v for k, v in f.items()} if isinstance(f, dict) else {}
+            flags = [_s(x) for x in (_get(fd, "flags") or [])]
+            funcs.append({"name": _s(_get(fd, "name")), "flags": flags})
+        code = _get(ld, "library_code")
+        out["libraries"].append(
+            {
+                "name": _s(_get(ld, "library_name")),
+                "engine": _s(_get(ld, "engine", default="")),
+                "functions": funcs,
+                "code": _s(code) if (full and code is not None) else None,
+            }
+        )
+    return out
+
+
+def _intf(d: dict, key: str) -> int:
+    try:
+        return int(d.get(key, 0))
+    except (ValueError, TypeError):
+        return 0
+
+
+def _cmd_calls(cs: Any, key: str) -> int:
+    """Calls for a `cmdstat_*` entry, from redis-py's nested dict or raw text."""
+    v = _get(cs, key)
+    if isinstance(v, dict):
+        try:
+            return int(v.get("calls", 0))
+        except (ValueError, TypeError):
+            return 0
+    if isinstance(v, str):
+        m = re.search(r"calls=(\d+)", v)
+        return int(m.group(1)) if m else 0
+    return 0
+
+
+def _slowlog_tokens(entry: Any) -> list[str]:
+    if isinstance(entry, dict):
+        cmd = _get(entry, "command")
+    elif isinstance(entry, (list, tuple)) and len(entry) >= 4:
+        cmd = entry[3]
+    else:
+        return []
+    if isinstance(cmd, (list, tuple)):
+        return [_s(t) for t in cmd]
+    return _s(cmd).split()
+
+
+def _scripting_usage(safe: SafeRedis) -> dict[str, int]:
+    """Scripting activity signals that work even with an empty cache / no FUNCTION.
+
+    Call counts come from INFO commandstats (cumulative since start); the distinct
+    count is a lower bound from whatever the slowlog happens to have captured.
+    """
+    usage = {
+        "eval_calls": 0,
+        "evalsha_calls": 0,
+        "fcall_calls": 0,
+        "slowlog_script_calls": 0,
+        "distinct_in_slowlog": 0,
+    }
+    try:
+        cs = safe.execute("INFO", "commandstats")
+        cs = cs if isinstance(cs, dict) else _parse_info_text(_s(cs))
+        usage["eval_calls"] = _cmd_calls(cs, "cmdstat_eval") + _cmd_calls(cs, "cmdstat_eval_ro")
+        usage["evalsha_calls"] = _cmd_calls(cs, "cmdstat_evalsha") + _cmd_calls(
+            cs, "cmdstat_evalsha_ro"
+        )
+        usage["fcall_calls"] = _cmd_calls(cs, "cmdstat_fcall") + _cmd_calls(cs, "cmdstat_fcall_ro")
+    except Exception:
+        pass
+    try:
+        distinct: set[str] = set()
+        seen = 0
+        for e in safe.execute("SLOWLOG", "GET", 128) or []:
+            toks = _slowlog_tokens(e)
+            if toks and toks[0].upper() in ("EVAL", "EVALSHA", "FCALL", "FCALL_RO"):
+                seen += 1
+                if len(toks) > 1:
+                    distinct.add(f"{toks[0].upper()}:{toks[1]}")
+        usage["slowlog_script_calls"] = seen
+        usage["distinct_in_slowlog"] = len(distinct)
+    except Exception:
+        pass
+    return usage
+
+
+def _parse_info_text(text: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and ":" in line:
+            k, _, v = line.partition(":")
+            out[k.strip()] = v.strip()
+    return out
 
 
 def scan_page(

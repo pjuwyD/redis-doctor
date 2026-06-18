@@ -31,6 +31,8 @@ ALLOWED_COMMANDS: frozenset[str] = frozenset(
         "HLEN",
         "XLEN",
         "XINFO",
+        "SCRIPT",  # EXISTS only; LOAD/FLUSH/KILL are mutating subcommands
+        "FUNCTION",  # LIST / STATS only; LOAD/DELETE/FLUSH/RESTORE are mutating
         "ACL",  # WHOAMI / LIST only
         "SENTINEL",  # read subcommands only
         "CLUSTER",  # read subcommands only
@@ -48,7 +50,7 @@ WRITE_COMMANDS: frozenset[str] = frozenset(
         "CLIENT KILL",
         "EVAL",
         "EVALSHA",
-        "SCRIPT",
+        "FCALL",
         "MEMORY PURGE",
         "XTRIM",
         "XGROUP",
@@ -117,7 +119,8 @@ _MUTATING_SUBCOMMANDS: dict[str, frozenset[str]] = {
     "MEMORY": frozenset({"PURGE", "MALLOC-STATS"}),
     "SLOWLOG": frozenset({"RESET"}),
     "ACL": frozenset({"SETUSER", "DELUSER", "LOAD", "SAVE"}),
-    "SCRIPT": frozenset({"FLUSH", "LOAD"}),
+    "SCRIPT": frozenset({"FLUSH", "LOAD", "KILL"}),
+    "FUNCTION": frozenset({"LOAD", "DELETE", "FLUSH", "RESTORE", "KILL"}),
 }
 
 

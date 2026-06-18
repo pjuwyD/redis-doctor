@@ -119,3 +119,39 @@ def test_list_bounded_head_tail(locked):
 def test_missing_key(locked):
     d = explore.key_detail(locked, "nope", full=False)
     assert d["exists"] is False
+
+
+def test_function_overview_returns_script_summary(locked):
+    # fakeredis has no FUNCTION support, so this exercises the degrade path:
+    # script cache summary is returned and supported is False.
+    out = explore.function_overview(locked, full=False)
+    assert out["supported"] is False
+    assert "cached_scripts" in out and "scripts_memory" in out
+    assert out["libraries"] == []
+
+
+def test_function_overview_full_requires_unlock(locked):
+    with pytest.raises(UnsafeCommandError):
+        explore.function_overview(locked, full=True)
+
+
+def test_function_overview_full_allowed_when_unlocked(unlocked):
+    out = explore.function_overview(unlocked, full=True)  # must not raise
+    assert out["full"] is True
+    assert "usage" in out  # call-count usage signals are always present
+
+
+def test_cmd_calls_parses_dict_and_text():
+    assert explore._cmd_calls({"cmdstat_eval": {"calls": 12}}, "cmdstat_eval") == 12
+    assert explore._cmd_calls({"cmdstat_eval": "calls=9,usec=3"}, "cmdstat_eval") == 9
+    assert explore._cmd_calls({}, "cmdstat_eval") == 0
+
+
+def test_slowlog_tokens_from_dict_and_list():
+    assert explore._slowlog_tokens({"command": "EVALSHA abc 0"}) == ["EVALSHA", "abc", "0"]
+    assert explore._slowlog_tokens({"command": ["EVAL", "return 1", "0"]}) == [
+        "EVAL",
+        "return 1",
+        "0",
+    ]
+    assert explore._slowlog_tokens([1, 2, 3, "EVAL body 0"]) == ["EVAL", "body", "0"]

@@ -289,6 +289,79 @@ async function exploreOpen(target, key) {
   }
 }
 
+async function exploreFunctions() {
+  const target = document.getElementById("exp-target").value.trim();
+  const pane = document.getElementById("explore-detail");
+  pane.innerHTML = "Loading…";
+  try {
+    const d = await jpost("/api/explore/functions", { target, full: exploreUnlocked() });
+    pane.innerHTML = renderFunctions(d);
+  } catch (err) {
+    pane.innerHTML = `<p class="muted">Error: ${esc(err.message)}</p>`;
+  }
+}
+
+function renderFunctions(d) {
+  const parts = [`<h3>Scripts &amp; Functions</h3>`];
+
+  // Section 1: the legacy EVAL/EVALSHA script cache. This is a SEPARATE subsystem
+  // from Functions below; the two counts are unrelated.
+  parts.push(`<h4>Legacy script cache (EVAL / EVALSHA)</h4>`);
+  parts.push(
+    `<p class="muted">Cached right now: <strong>${d.cached_scripts}</strong> · ` +
+      `memory ${humanBytes(d.scripts_memory)}. These are scripts loaded with ` +
+      `<code>SCRIPT LOAD</code> / <code>EVAL</code>; Redis cannot list their bodies. ` +
+      `This count is unrelated to the Functions below.</p>`
+  );
+  const u = d.usage || {};
+  if (u.eval_calls || u.evalsha_calls || u.fcall_calls || u.slowlog_script_calls) {
+    let usage =
+      `Usage since start: EVAL <strong>${u.eval_calls || 0}</strong> · ` +
+      `EVALSHA <strong>${u.evalsha_calls || 0}</strong> · ` +
+      `FCALL <strong>${u.fcall_calls || 0}</strong> calls`;
+    if (u.slowlog_script_calls)
+      usage += ` · ${u.distinct_in_slowlog} distinct script(s) seen in the slowlog`;
+    parts.push(`<p class="muted">${usage}</p>`);
+  }
+
+  // Section 2: Functions (FUNCTION LOAD) — a different registry.
+  parts.push(`<h4>Functions</h4>`);
+  if (!d.supported) {
+    parts.push(`<p class="muted">This server has no FUNCTION support (Redis &lt; 7.0).</p>`);
+    return parts.join("");
+  }
+  if (!d.libraries.length) {
+    parts.push(`<p class="muted">No Function libraries registered.</p>`);
+    return parts.join("");
+  }
+  const fnCount = d.libraries.reduce((n, l) => n + l.functions.length, 0);
+  const libWord = d.libraries.length === 1 ? "library" : "libraries";
+  parts.push(
+    `<p class="muted"><strong>${d.libraries.length}</strong> ${libWord}, ` +
+      `<strong>${fnCount}</strong> function(s) registered ` +
+      `(separate from the script cache above).` +
+      (d.full ? "" : " Unlock (🔓) and re-open to view source.") +
+      `</p>`
+  );
+  for (const lib of d.libraries) {
+    const fns = lib.functions
+      .map(
+        (f) =>
+          `<li><code>${esc(f.name)}</code>` +
+          (f.flags.length ? ` <span class="muted">[${esc(f.flags.join(", "))}]</span>` : "") +
+          `</li>`
+      )
+      .join("");
+    let body =
+      `<div class="kd-key">${esc(lib.name)}</div>` +
+      `<p class="muted">engine ${esc(lib.engine)} · ${lib.functions.length} function(s)</p>` +
+      `<ul>${fns}</ul>`;
+    if (lib.code != null) body += `<pre class="strval">${esc(lib.code)}</pre>`;
+    parts.push(`<div class="stream-entry">${body}</div>`);
+  }
+  return parts.join("");
+}
+
 function humanBytes(n) {
   if (n == null) return "?";
   if (n < 1024) return n + " B";
@@ -462,6 +535,7 @@ document.getElementById("explore-form").addEventListener("submit", (e) => {
   exploreScan(true);
 });
 document.getElementById("explore-more").addEventListener("click", () => exploreScan(false));
+document.getElementById("exp-functions").addEventListener("click", exploreFunctions);
 
 // JSON tree controls (delegated, since the detail pane is re-rendered each open).
 const exploreDetailEl = document.getElementById("explore-detail");

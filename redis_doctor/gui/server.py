@@ -48,7 +48,7 @@ class ScanRequest(BaseModel):
 
 class KeyRequest(BaseModel):
     target: str
-    key: str
+    key: str = ""
     full: bool = False
 
 
@@ -195,6 +195,18 @@ def create_app(config: Config | None = None, fleet: list[dict] | None = None) ->
         safe = connect(parse_target(req.target), allow_expensive=req.full)
         try:
             return key_detail(safe, req.key, full=req.full)
+        finally:
+            safe.close()
+
+    @app.post("/api/explore/functions")
+    def api_explore_functions(req: KeyRequest):
+        from ..explore import function_overview
+
+        # `full` includes Function source code (FUNCTION LIST WITHCODE) and needs
+        # the same unlock as full value reads.
+        safe = connect(parse_target(req.target), allow_expensive=req.full)
+        try:
+            return function_overview(safe, full=req.full)
         finally:
             safe.close()
 

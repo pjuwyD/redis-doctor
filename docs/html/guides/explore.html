@@ -66,6 +66,15 @@
 <p>(<strong>🔓 full reads UNLOCKED</strong>). Subsequent key opens read the full value.</p>
 <ol><li><strong>Load more</strong> pages through the keyspace.</li></ol>
 <p>Even when unlocked, full reads are <strong>capped</strong> (<code>FULL_MAX_ELEMENTS</code> elements; a full string <code>GET</code> is refused above ~1 MB) so an unlock cannot pull an unbounded payload or stall the server.</p>
+<h2 id="scripts-functions">Scripts &amp; Functions<a class="anchor" href="#scripts-functions">#</a></h2>
+<p>The <strong>Scripts &amp; Functions</strong> button shows the server&#x27;s scripting state. Note that the <strong>legacy script cache and Functions are two separate subsystems</strong>: the cached count and the number of Function libraries are unrelated and will usually differ.</p>
+<ul><li><strong>Cached Lua scripts</strong> — the <em>current</em> cache count (<code>number_of_cached_scripts</code>)</li></ul>
+<p>and the memory the scripting subsystem uses. Redis provides no command to list cached <code>EVAL</code>/<code>EVALSHA</code> bodies, so the bodies are not shown (a Redis limitation, not the tool&#x27;s). A count of <code>0</code> just means the cache is empty right now.</p>
+<ul><li><strong>Usage since start</strong> — because the cache count can be 0 even on a server that</li></ul>
+<p>uses scripts heavily, the overview also shows cumulative <code>EVAL</code> / <code>EVALSHA</code> / <code>FCALL</code> call counts (from <code>INFO commandstats</code>) and the number of distinct scripts the slowlog happened to capture. This works even on Redis without FUNCTION support.</p>
+<ul><li><strong>Functions</strong> (Redis 7.0+) — each registered library with its functions and</li></ul>
+<p>flags. The <strong>source code</strong> is shown only when you <strong>unlock</strong> (🔓), the same lock as full value reads; locked, you see names and flags but no code. The unlock is enforced server-side (<code>FUNCTION LIST WITHCODE</code> is only issued on an unlocked connection).</p>
+<p>On Redis older than 7.0, only the cached-script summary is shown.</p>
 <h2 id="json-values">JSON values<a class="anchor" href="#json-values">#</a></h2>
 <p>When a value is JSON (a string that parses as an object or array — common in queues, event payloads, and caches), the preview renders it as a <strong>collapsible tree</strong> rather than one long line:</p>
 <ul><li>the top level is expanded and everything nested is collapsed; click a node to</li></ul>

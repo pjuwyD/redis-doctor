@@ -21,6 +21,7 @@ from .analyzers.latency_rules import LatencyAnalyzer
 from .analyzers.memory_rules import MemoryAnalyzer
 from .analyzers.persistence_rules import PersistenceAnalyzer
 from .analyzers.replication_rules import ReplicationAnalyzer
+from .analyzers.scripting_rules import ScriptingAnalyzer
 from .analyzers.security_rules import SecurityAnalyzer
 from .analyzers.server_rules import ServerAnalyzer
 from .analyzers.slowlog_rules import SlowlogAnalyzer
@@ -36,6 +37,7 @@ from .collectors.latency import LatencyCollector
 from .collectors.memory import MemoryCollector
 from .collectors.persistence import PersistenceCollector
 from .collectors.replication import ReplicationCollector
+from .collectors.scripting import ScriptingCollector
 from .collectors.security import SecurityCollector
 from .collectors.slowlog import SlowlogCollector
 from .collectors.streams import StreamCollector
@@ -98,6 +100,7 @@ def _registry() -> list[ModuleSpec]:
         ModuleSpec("streams", StreamCollector(), StreamAnalyzer()),
         ModuleSpec("clients", ClientCollector(), ClientAnalyzer()),
         ModuleSpec("slowlog", SlowlogCollector(), SlowlogAnalyzer()),
+        ModuleSpec("scripting", ScriptingCollector(), ScriptingAnalyzer()),
         ModuleSpec("security", SecurityCollector(), SecurityAnalyzer()),
     ]
 

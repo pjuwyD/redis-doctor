@@ -32,6 +32,29 @@ Even when unlocked, full reads are **capped** (`FULL_MAX_ELEMENTS` elements; a f
 string `GET` is refused above ~1 MB) so an unlock cannot pull an unbounded payload
 or stall the server.
 
+## Scripts & Functions
+
+The **Scripts & Functions** button shows the server's scripting state. Note that
+the **legacy script cache and Functions are two separate subsystems**: the cached
+count and the number of Function libraries are unrelated and will usually differ.
+
+- **Cached Lua scripts** — the *current* cache count (`number_of_cached_scripts`)
+  and the memory the scripting subsystem uses. Redis provides no command to list
+  cached `EVAL`/`EVALSHA` bodies, so the bodies are not shown (a Redis limitation,
+  not the tool's). A count of `0` just means the cache is empty right now.
+- **Usage since start** — because the cache count can be 0 even on a server that
+  uses scripts heavily, the overview also shows cumulative `EVAL` / `EVALSHA` /
+  `FCALL` call counts (from `INFO commandstats`) and the number of distinct scripts
+  the slowlog happened to capture. This works even on Redis without FUNCTION
+  support.
+- **Functions** (Redis 7.0+) — each registered library with its functions and
+  flags. The **source code** is shown only when you **unlock** (🔓), the same lock
+  as full value reads; locked, you see names and flags but no code. The unlock is
+  enforced server-side (`FUNCTION LIST WITHCODE` is only issued on an unlocked
+  connection).
+
+On Redis older than 7.0, only the cached-script summary is shown.
+
 ## JSON values
 
 When a value is JSON (a string that parses as an object or array — common in

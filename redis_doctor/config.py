@@ -50,6 +50,9 @@ class Thresholds(BaseModel):
     slowlog_max_entries: int = 128
     replica_lag_warning_seconds: int = 30
     replica_lag_critical_seconds: int = 120
+    cached_scripts_warning: int = 1000
+    scripts_memory_warning_mb: float = 50
+    eval_inline_warning: int = 5
 
 
 class TTLExpectation(BaseModel):

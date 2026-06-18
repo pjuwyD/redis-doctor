@@ -93,6 +93,19 @@ configuration; the triggers below describe the default behavior.
 | `slowlog.repeated_slow_command` | warning | same command pattern repeats often |
 | `slowlog.length_near_max` | warning | slowlog length near slowlog-max-len |
 
+## scripting
+
+| ID | Severity | Trigger |
+|---|---|---|
+| `scripting.many_cached_scripts` | warning | `number_of_cached_scripts` over the threshold |
+| `scripting.scripts_high_memory` | warning | script/function memory over the threshold |
+| `scripting.long_running_script` | critical | a script/function is currently running (`FUNCTION STATS`) |
+| `scripting.functions_registered` | info | registered Function libraries/functions (visibility) |
+| `scripting.eval_inline_repeated` | warning | inline `EVAL` repeats in the slowlog (use EVALSHA/Functions) |
+
+Note: legacy `EVAL`/`EVALSHA` scripts cannot be enumerated by Redis, so only the
+cache count and memory are available; Functions (Redis 7.0+) are listed by name.
+
 ## latency
 
 | ID | Severity | Trigger |

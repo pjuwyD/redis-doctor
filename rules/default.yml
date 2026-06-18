@@ -64,6 +64,13 @@ rules:
   slowlog.repeated_slow_command: { enabled: true }
   slowlog.length_near_max: { enabled: true }
 
+  # scripting
+  scripting.many_cached_scripts: { enabled: true, cached_scripts_warning: 1000 }
+  scripting.scripts_high_memory: { enabled: true, scripts_memory_warning_mb: 50 }
+  scripting.long_running_script: { enabled: true }
+  scripting.functions_registered: { enabled: true }
+  scripting.eval_inline_repeated: { enabled: true }
+
   # latency
   latency.spike: { enabled: true }
   latency.fork_slow: { enabled: true }
