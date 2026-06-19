@@ -67,6 +67,14 @@ class RedisDoctorTUI(App):
         ("e", "expand", "Expand"),
         ("f", "filter", "Filter"),
         ("s", "save", "Save"),
+        ("j", "scroll(1)", "Scroll ↓"),
+        ("k", "scroll(-1)", "Scroll ↑"),
+        # Page-wise scrolling, kept off the footer to avoid clutter.
+        ("pagedown", "scroll_page(1)", "Page ↓"),
+        ("space", "scroll_page(1)", "Page ↓"),
+        ("pageup", "scroll_page(-1)", "Page ↑"),
+        ("home", "scroll_end(-1)", "Top"),
+        ("end", "scroll_end(1)", "Bottom"),
         ("q", "quit", "Quit"),
     ]
 
@@ -116,6 +124,30 @@ class RedisDoctorTUI(App):
     def action_filter(self) -> None:
         self.filter_index = (self.filter_index + 1) % len(_FILTER_CYCLE)
         self.refresh_content()
+
+    # --- scrolling --------------------------------------------------------
+    # The sidebar ListView holds keyboard focus, so the content's VerticalScroll
+    # never receives Page/arrow keys. These bindings scroll it directly.
+
+    def _content_scroll(self) -> VerticalScroll:
+        return self.query_one("#content-wrap", VerticalScroll)
+
+    def action_scroll(self, direction: int) -> None:
+        self._content_scroll().scroll_relative(y=direction * 3, animate=False)
+
+    def action_scroll_page(self, direction: int) -> None:
+        scroll = self._content_scroll()
+        if direction > 0:
+            scroll.scroll_page_down(animate=False)
+        else:
+            scroll.scroll_page_up(animate=False)
+
+    def action_scroll_end(self, direction: int) -> None:
+        scroll = self._content_scroll()
+        if direction > 0:
+            scroll.scroll_end(animate=False)
+        else:
+            scroll.scroll_home(animate=False)
 
     def action_save(self) -> None:
         if self.report is None:

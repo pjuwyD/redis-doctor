@@ -112,6 +112,48 @@ def test_tui_mounts_and_interactions(tmp_path):
     asyncio.run(scenario())
 
 
+def test_tui_keyboard_scrolls_content():
+    """Findings can be scrolled by keyboard even though the sidebar has focus."""
+    report = _report()
+    # Enough findings that the expanded Health panel overflows the viewport.
+    report.findings = [
+        Finding(
+            id=f"memory.rule_{i}",
+            severity=Severity.WARNING,
+            category=Category.MEMORY,
+            title=f"finding {i}",
+            explanation="a fairly long explanation line " * 3,
+            suggested_checks=["redis-cli INFO memory"],
+            suggested_fixes=["do the thing"],
+        )
+        for i in range(40)
+    ]
+
+    async def scenario():
+        app = RedisDoctorTUI(lambda: report, target="x")
+        async with app.run_test(size=(80, 24)) as pilot:
+            await _wait_for_report(app, pilot)
+            await pilot.press("e")  # expand
+            await pilot.pause()
+            scroll = app.query_one("#content-wrap")
+            assert scroll.scroll_offset.y == 0
+
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert scroll.scroll_offset.y > 0
+
+            moved = scroll.scroll_offset.y
+            await pilot.press("k")  # line up
+            await pilot.pause()
+            assert scroll.scroll_offset.y < moved
+
+            await pilot.press("end")
+            await pilot.pause()
+            assert scroll.scroll_offset.y >= moved
+
+    asyncio.run(scenario())
+
+
 def test_tui_rerun_uses_fresh_report():
     reports = [_report(), _report()]
     reports[1].health_score = 42
