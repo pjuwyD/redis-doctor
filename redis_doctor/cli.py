@@ -241,7 +241,7 @@ def analyze(
 
     def body() -> int:
         if fleet:
-            return _run_fleet(fleet, config, output)
+            return _run_fleet(fleet, config, fmt, output)
         return run_and_emit(
             conn=conn,
             config=config,
@@ -256,8 +256,12 @@ def analyze(
     _run(body)
 
 
-def _run_fleet(fleet_path: str, config: str | None, output: str | None) -> int:
-    """Run all targets in a fleet file sequentially; write one combined JSON."""
+def _run_fleet(fleet_path: str, config: str | None, fmt: str | None, output: str | None) -> int:
+    """Run all targets in a fleet file sequentially and emit the combined result.
+
+    JSON (the fleet default) is one combined document; markdown and terminal
+    concatenate the per-instance reports.
+    """
     import json
 
     import yaml
@@ -267,9 +271,9 @@ def _run_fleet(fleet_path: str, config: str | None, output: str | None) -> int:
         spec = yaml.safe_load(open(fleet_path).read()) or {}
     except (OSError, yaml.YAMLError) as e:
         raise ConfigError(f"could not read fleet file {fleet_path}: {e}") from e
-    targets = spec.get("targets", [])
-    instances = []
-    for entry in targets:
+
+    results = []  # (name, target_str, report-or-None, error-or-None)
+    for entry in spec.get("targets", []):
         url = entry.get("url") if isinstance(entry, dict) else entry
         name = entry.get("name", url) if isinstance(entry, dict) else url
         try:
@@ -279,22 +283,57 @@ def _run_fleet(fleet_path: str, config: str | None, output: str | None) -> int:
                 report = run_pipeline(safe, cfg)
             finally:
                 safe.close()
-            instances.append(
-                {
-                    "name": name,
-                    "target": target.redacted_url(),
-                    "score": report.health_score,
-                    "report": report.model_dump(mode="json"),
-                }
-            )
+            results.append((name, target.redacted_url(), report, None))
         except RedisDoctorError as e:
-            instances.append({"name": name, "target": url, "error": str(e)})
-    combined = json.dumps({"instances": instances}, indent=2, default=str)
+            results.append((name, url, None, str(e)))
+
+    resolved_fmt = fmt or "json"
+    if resolved_fmt == "terminal":
+        def _emit(sink: Console) -> None:
+            for name, target_str, report, error in results:
+                sink.print(f"=== {name} ({target_str}) ===")
+                if report is None:
+                    sink.print(f"error: {error}")
+                else:
+                    terminal.render(report, sink)
+
+        if output:
+            with open(output, "w") as fh:
+                _emit(Console(file=fh, force_terminal=False))
+        else:
+            _emit(console)
+        return ExitCode.SUCCESS
+
+    if resolved_fmt == "json":
+        instances = [
+            {"name": name, "target": target_str, "error": error}
+            if report is None
+            else {
+                "name": name,
+                "target": target_str,
+                "score": report.health_score,
+                "report": report.model_dump(mode="json"),
+            }
+            for name, target_str, report, error in results
+        ]
+        text = json.dumps({"instances": instances}, indent=2, default=str)
+    elif resolved_fmt == "markdown":
+        from .output import markdown
+
+        blocks = []
+        for name, target_str, report, error in results:
+            header = f"**Instance:** {name} ({target_str})"
+            body = f"**Error:** {error}" if report is None else markdown.render_markdown(report)
+            blocks.append(f"{header}\n\n{body}")
+        text = "\n\n---\n\n".join(blocks)
+    else:
+        raise ConfigError(f"invalid --format value: {fmt!r}")
+
     if output:
         with open(output, "w") as fh:
-            fh.write(combined)
+            fh.write(text)
     else:
-        console.print(combined, markup=False, highlight=False)
+        console.print(text, soft_wrap=True, markup=False, highlight=False)
     return ExitCode.SUCCESS
 
 

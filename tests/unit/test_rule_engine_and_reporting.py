@@ -113,6 +113,47 @@ def test_report_subcommand_bad_file():
     assert result.exit_code == ExitCode.INVALID_CONFIG
 
 
+def _stub_fleet(monkeypatch, report):
+    import redis_doctor.cli as cli_mod
+
+    class _Dummy:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(cli_mod, "connect", lambda target: _Dummy())
+    monkeypatch.setattr(cli_mod, "run_pipeline", lambda safe, cfg: report)
+
+
+def test_fleet_honors_markdown_format(tmp_path, monkeypatch):
+    rep = _report(
+        [Finding(id="memory.high_usage", severity=Severity.CRITICAL, category=Category.MEMORY,
+                 title="high")]
+    )
+    _stub_fleet(monkeypatch, rep)
+    fleet_file = tmp_path / "fleet.yml"
+    fleet_file.write_text("targets:\n  - {name: a, url: 'redis://localhost:6379'}\n")
+    out = tmp_path / "fleet_out.md"
+
+    result = runner.invoke(
+        app, ["analyze", "--fleet", str(fleet_file), "--format", "markdown", "--output", str(out)]
+    )
+    assert result.exit_code == 0
+    text = out.read_text()
+    assert "# Redis Doctor Report" in text  # markdown, not the JSON dump
+    assert '"instances"' not in text
+    assert "memory.high_usage" in text
+
+
+def test_fleet_defaults_to_json(tmp_path, monkeypatch):
+    _stub_fleet(monkeypatch, _report([]))
+    fleet_file = tmp_path / "fleet.yml"
+    fleet_file.write_text("targets:\n  - {name: a, url: 'redis://localhost:6379'}\n")
+
+    result = runner.invoke(app, ["analyze", "--fleet", str(fleet_file)])
+    assert result.exit_code == 0
+    assert '"instances"' in result.stdout
+
+
 def test_secret_never_in_json_report():
     rep = _report([])
     rep.target = "redis://:***@host:6379/0"
