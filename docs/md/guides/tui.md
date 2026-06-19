@@ -35,9 +35,14 @@ Sentinel   - Sentinel topology (when connected via Sentinel)
 | arrows / mouse | switch panels via the sidebar |
 | `e` | expand the selected view's findings to show evidence, checks, and fixes |
 | `f` | cycle the severity filter: all → critical → warning |
+| `j` / `k` | scroll the content down / up (also `PageDown`/`Space`, `PageUp`, `Home`, `End`) |
 | `r` | re-run the full analysis and refresh every panel |
 | `s` | save the current report to JSON (prompts for a path) |
 | `q` | quit |
+
+The sidebar keeps keyboard focus, so the scroll keys above (and the mouse wheel)
+move the content pane directly — useful when expanded findings run past the
+bottom of the screen.
 
 The analysis runs in a background worker so the UI stays responsive, and a render
 error in one panel never tears down the app.
