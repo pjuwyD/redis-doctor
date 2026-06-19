@@ -27,8 +27,12 @@ See `redis-doctor.md` for the full engineering specification.
 
 ## Install
 
+redis-doctor is distributed as a wheel attached to each
+[GitHub Release](https://github.com/pjuwyD/redis-doctor/releases) (it is not yet on PyPI).
+Download the wheel for the version you want, then install it:
+
 ```bash
-pipx install redis-doctor
+pipx install ./redis_doctor-1.0.0-py3-none-any.whl
 ```
 
 ## Usage
@@ -50,10 +54,16 @@ redis-doctor analyze --fleet fleet.yml --output fleet.json
 
 ## Optional extras
 
+The TUI and web GUI ship as optional extras. Add them with `pipx inject` after installing
+(pipx ignores `[extras]` appended to a local wheel path, so it must be a separate step):
+
 ```bash
-pip install 'redis-doctor[tui]'   # interactive terminal UI (Textual)
-pip install 'redis-doctor[gui]'   # web dashboard + PDF export (FastAPI, WeasyPrint)
+pipx inject redis-doctor 'redis-doctor[tui]'   # interactive terminal UI (Textual)
+pipx inject redis-doctor 'redis-doctor[gui]'   # web dashboard + PDF export (FastAPI, WeasyPrint)
 ```
+
+The `gui` extra's PDF export uses WeasyPrint, which needs system Pango libraries
+(e.g. `libpango-1.0-0`, `libpangoft2-1.0-0`) installed on the machine.
 
 ```bash
 redis-doctor tui redis://localhost:6379      # interactive TUI
