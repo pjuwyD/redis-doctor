@@ -156,6 +156,21 @@ function renderOverview(ov) {
       `<div class="statebar">${segs}</div>` +
       `<div class="legend-row">${legend}</div>`;
   }
+
+  if (ov.databases && ov.databases.length > 1) {
+    const rows = ov.databases
+      .map(
+        (d) =>
+          `<tr><td>${esc(d.db)}</td><td>${fmtNum(d.keys)}</td>` +
+          `<td>${fmtNum(d.expires)}</td><td>${d.no_ttl_pct}%</td></tr>`
+      )
+      .join("");
+    html +=
+      `<div class="ov-sub has-tip" data-tip="Per-DB key counts from INFO keyspace. ` +
+      `Sampling/findings below cover only the connected DB.">Databases</div>` +
+      `<table class="kv db-table"><thead><tr><th>DB</th><th>Keys</th>` +
+      `<th>With TTL</th><th>No TTL</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
   box.innerHTML = html;
 }
 
@@ -275,7 +290,76 @@ document.getElementById("run-form").addEventListener("submit", async (e) => {
   }
 });
 
+// --- Trends ----------------------------------------------------------------
+
+let trendChart = null;
+let trendData = [];
+const TREND_LABEL = {
+  health_score: "Health score",
+  memory_bytes: "Memory used",
+  keys: "Keys",
+  idle_clients: "Idle clients (>1h)",
+  stream_length: "Stream length",
+};
+
+async function loadTrends() {
+  const wrap = document.getElementById("trends");
+  trendData = await jget("/api/trends");
+  const targets = [...new Set(trendData.map((p) => p.target))];
+  if (trendData.length < 2 || !targets.length) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  const sel = document.getElementById("trend-target");
+  const prev = sel.value;
+  sel.innerHTML = targets.map((t) => `<option value="${escAttr(t)}">${esc(t)}</option>`).join("");
+  if (targets.includes(prev)) sel.value = prev;
+  drawTrend();
+}
+
+function drawTrend() {
+  const target = document.getElementById("trend-target").value;
+  const metric = document.getElementById("trend-metric").value;
+  const points = trendData
+    .filter((p) => p.target === target)
+    .filter((p) => p[metric] != null);
+  const ctx = document.getElementById("trend-chart");
+  if (trendChart) trendChart.destroy();
+  const isBytes = metric === "memory_bytes";
+  trendChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: points.map((p) => esc(p.generated_at).replace("T", " ").slice(0, 16)),
+      datasets: [
+        {
+          label: TREND_LABEL[metric],
+          data: points.map((p) => p[metric]),
+          borderColor: "#6688cc",
+          backgroundColor: "rgba(102,136,204,0.15)",
+          fill: true,
+          tension: 0.2,
+          pointRadius: 2,
+        },
+      ],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          beginAtZero: metric !== "health_score",
+          ticks: isBytes ? { callback: (v) => humanBytes(v) } : {},
+        },
+      },
+    },
+  });
+}
+
+document.getElementById("trend-target").addEventListener("change", drawTrend);
+document.getElementById("trend-metric").addEventListener("change", drawTrend);
+
 async function loadHistory() {
+  loadTrends().catch(() => {});
   const tbody = document.querySelector("#history-table tbody");
   tbody.innerHTML = "";
   const rows = await jget("/api/reports");
@@ -413,6 +497,11 @@ function exploreUnlocked() {
   return document.getElementById("exp-unlock").checked;
 }
 
+function exploreDb() {
+  const v = document.getElementById("exp-db").value.trim();
+  return v === "" ? null : parseInt(v, 10);
+}
+
 document.getElementById("exp-unlock").addEventListener("change", () => {
   const label = document.getElementById("exp-lock-label");
   if (exploreUnlocked()) {
@@ -445,6 +534,7 @@ async function exploreScan(reset) {
       match,
       cursor: exploreCursor,
       count: 500,
+      db: exploreDb(),
     });
     exploreCursor = page.cursor;
     for (const k of page.keys) {
@@ -472,7 +562,7 @@ async function exploreOpen(target, key) {
   const pane = document.getElementById("explore-detail");
   pane.innerHTML = "Loading…";
   try {
-    const d = await jpost("/api/explore/key", { target, key, full: exploreUnlocked() });
+    const d = await jpost("/api/explore/key", { target, key, full: exploreUnlocked(), db: exploreDb() });
     pane.innerHTML = renderKeyDetail(d);
   } catch (err) {
     pane.innerHTML = `<p class="muted">Error: ${esc(err.message)}</p>`;
@@ -484,7 +574,7 @@ async function exploreFunctions() {
   const pane = document.getElementById("explore-detail");
   pane.innerHTML = "Loading…";
   try {
-    const d = await jpost("/api/explore/functions", { target, full: exploreUnlocked() });
+    const d = await jpost("/api/explore/functions", { target, full: exploreUnlocked(), db: exploreDb() });
     pane.innerHTML = renderFunctions(d);
   } catch (err) {
     pane.innerHTML = `<p class="muted">Error: ${esc(err.message)}</p>`;

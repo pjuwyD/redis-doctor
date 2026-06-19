@@ -143,6 +143,13 @@ def overview_table(ov: dict | None) -> Table | None:
         val = f"{keys['total']:,}{sampled}"
         table.add_row("Keys", val + (f"   {dist}" if dist else ""))
 
+    databases = ov.get("databases")
+    if databases and len(databases) > 1:
+        per_db = "  ".join(
+            f"{d['db']} {d['keys']:,} ({d['no_ttl_pct']:.0f}% no TTL)" for d in databases[:8]
+        )
+        table.add_row("Databases", per_db)
+
     streams = ov.get("streams")
     if streams is not None:
         table.add_row("Streams", f"{streams['count']:,}  ({streams['total_pending']:,} pending)")

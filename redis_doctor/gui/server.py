@@ -44,12 +44,14 @@ class ScanRequest(BaseModel):
     match: str | None = None
     cursor: int = 0
     count: int = 500
+    db: int | None = None
 
 
 class KeyRequest(BaseModel):
     target: str
     key: str = ""
     full: bool = False
+    db: int | None = None
 
 
 class SuppressRequest(BaseModel):
@@ -108,6 +110,11 @@ def create_app(config: Config | None = None, fleet: list[dict] | None = None) ->
     @app.get("/api/reports")
     def api_reports():
         return store.list()
+
+    @app.get("/api/trends")
+    def api_trends():
+        # Time series of key metrics per target, built from stored reports.
+        return store.trends()
 
     @app.get("/api/reports/{report_id}")
     def api_report(report_id: int):
@@ -191,7 +198,9 @@ def create_app(config: Config | None = None, fleet: list[dict] | None = None) ->
     def api_explore_scan(req: ScanRequest):
         from ..explore import scan_page
 
-        safe = connect(parse_target(req.target))
+        # `db` selects a specific logical DB (chosen at connect time; SELECT is
+        # never issued). None keeps whatever the target URL specifies.
+        safe = connect(parse_target(req.target, db=req.db))
         try:
             return scan_page(safe, match=req.match, cursor=req.cursor, count=req.count)
         finally:
@@ -203,7 +212,7 @@ def create_app(config: Config | None = None, fleet: list[dict] | None = None) ->
 
         # Full value reads require an unlocked connection; the lock is enforced at
         # the safety layer, not just in the UI.
-        safe = connect(parse_target(req.target), allow_expensive=req.full)
+        safe = connect(parse_target(req.target, db=req.db), allow_expensive=req.full)
         try:
             return key_detail(safe, req.key, full=req.full)
         finally:
@@ -215,7 +224,7 @@ def create_app(config: Config | None = None, fleet: list[dict] | None = None) ->
 
         # `full` includes Function source code (FUNCTION LIST WITHCODE) and needs
         # the same unlock as full value reads.
-        safe = connect(parse_target(req.target), allow_expensive=req.full)
+        safe = connect(parse_target(req.target, db=req.db), allow_expensive=req.full)
         try:
             return function_overview(safe, full=req.full)
         finally:

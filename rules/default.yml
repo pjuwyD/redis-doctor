@@ -22,6 +22,7 @@ rules:
   # keyspace
   keyspace.dominant_prefix: { enabled: true }
   keyspace.high_key_count: { enabled: true }
+  keyspace.multiple_dbs: { enabled: true }
 
   # ttl
   ttl.locks_without_ttl: { enabled: true }

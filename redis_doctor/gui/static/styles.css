@@ -84,6 +84,11 @@ table.kv { font-size: 0.85rem; }
 table.kv td:first-child, table.kv th:first-child { color: #444; white-space: nowrap;
         font-family: monospace; }
 table.kv td { word-break: break-word; }
+table.db-table { max-width: 32rem; }
+.trend-controls { display: flex; gap: 1.2rem; align-items: center; margin: 0.4rem 0 0.8rem;
+        font-size: 0.85rem; color: #444; }
+.trend-controls select { margin-left: 0.3rem; }
+#trends canvas { max-height: 240px; }
 .stream-entry { border: 1px solid #eef0f4; border-radius: 6px; padding: 0.5rem 0.6rem;
         margin: 0.5rem 0; }
 .stream-entry > code { display: inline-block; margin-bottom: 0.4rem; color: #2f6fed; }

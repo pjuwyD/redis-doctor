@@ -33,6 +33,7 @@ configuration; the triggers below describe the default behavior.
 |---|---|---|
 | `keyspace.dominant_prefix` | info | one prefix > 50% of the sample |
 | `keyspace.high_key_count` | warning | very large DBSIZE with a high no-TTL share |
+| `keyspace.multiple_dbs` | info | keys spread across more than one logical DB |
 
 ## ttl
 

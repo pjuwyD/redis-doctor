@@ -64,6 +64,45 @@ def test_history_persists_across_instances(tmp_path):
     assert len(HistoryStore(path).list()) == 1
 
 
+def _overview_report(score, used_memory, keys, idle, stream_len):
+    return _report(
+        score=score,
+        stats={
+            "overview": {
+                "memory": {"used_bytes": used_memory},
+                "keys": {"total": keys},
+                "clients": {"idle_over_1h": idle},
+            },
+            "streams": [{"name": "s", "length": stream_len, "groups": []}],
+        },
+    )
+
+
+def test_history_trends_series(tmp_path):
+    store = HistoryStore(str(tmp_path / "h.db"))
+    store.save(_overview_report(80, 1000, 50, 2, 10))
+    store.save(_overview_report(70, 2000, 60, 5, 30))
+    series = store.trends()
+    assert len(series) == 2
+    # Oldest first, with metrics pulled from the stored report JSON.
+    assert series[0]["health_score"] == 80
+    assert series[0]["memory_bytes"] == 1000
+    assert series[0]["keys"] == 50
+    assert series[0]["idle_clients"] == 2
+    assert series[0]["stream_length"] == 10
+    assert series[1]["stream_length"] == 30
+    assert series[1]["target"] == series[0]["target"]
+
+
+def test_history_trends_tolerates_missing_metrics(tmp_path):
+    store = HistoryStore(str(tmp_path / "h.db"))
+    store.save(_report(score=90))  # no overview/streams in stats
+    point = store.trends()[0]
+    assert point["health_score"] == 90
+    assert point["memory_bytes"] is None
+    assert point["stream_length"] is None
+
+
 # --- diff -----------------------------------------------------------------
 
 
@@ -168,6 +207,53 @@ def test_gui_api_endpoints(tmp_path):
     assert fleet[0]["name"] == "n1"
 
     assert client.get("/").status_code == 200
+
+
+def test_gui_trends_endpoint(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from redis_doctor.gui.server import create_app
+
+    cfg = Config()
+    cfg.history.path = str(tmp_path / "h.db")
+    client = TestClient(create_app(cfg))
+    store = HistoryStore(cfg.history.path)
+    store.save(_overview_report(80, 1000, 50, 2, 10))
+    store.save(_overview_report(70, 2000, 60, 5, 30))
+
+    series = client.get("/api/trends").json()
+    assert [p["health_score"] for p in series] == [80, 70]
+    assert series[1]["memory_bytes"] == 2000
+
+
+def test_gui_explore_db_selects_logical_db(tmp_path, monkeypatch):
+    """The Explore DB number is applied at connect time (no SELECT)."""
+    from fastapi.testclient import TestClient
+
+    import redis_doctor.explore as explore_mod
+    from redis_doctor.gui import server as srv
+
+    captured = {}
+
+    class FakeSafe:
+        def close(self):
+            pass
+
+    def fake_connect(target, allow_expensive=False):
+        captured["db"] = target.db
+        return FakeSafe()
+
+    monkeypatch.setattr(srv, "connect", fake_connect)
+    monkeypatch.setattr(
+        explore_mod, "scan_page", lambda safe, **kw: {"keys": [], "cursor": 0, "complete": True}
+    )
+
+    cfg = Config()
+    cfg.history.path = str(tmp_path / "h.db")
+    client = TestClient(srv.create_app(cfg))
+
+    client.post("/api/explore/scan", json={"target": "redis://x:6379/0", "db": 4})
+    assert captured["db"] == 4
 
 
 def test_gui_schedule_crud(tmp_path):

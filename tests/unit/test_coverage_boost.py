@@ -58,6 +58,27 @@ def test_keyspace_empty_sample(ctx):
     assert KeyspaceAnalyzer().analyze(ctx) == []
 
 
+def test_keyspace_multiple_dbs(ctx):
+    from redis_doctor.models.server import ServerInfo
+
+    # Fires from INFO keyspace even with no SCAN sample (covers the connected DB
+    # only); more than one populated logical DB.
+    ctx.collected["info"] = ServerInfo(
+        keyspace={"db0": {"keys": 100, "expires": 100}, "db3": {"keys": 5, "expires": 0}}
+    )
+    f = _ids(KeyspaceAnalyzer().analyze(ctx))
+    assert "keyspace.multiple_dbs" in f
+    assert "db3" in f["keyspace.multiple_dbs"].evidence
+
+
+def test_keyspace_single_db_no_multiple_dbs(ctx):
+    from redis_doctor.models.server import ServerInfo
+
+    ctx.collected["info"] = ServerInfo(keyspace={"db0": {"keys": 100, "expires": 100}})
+    f = _ids(KeyspaceAnalyzer().analyze(ctx))
+    assert "keyspace.multiple_dbs" not in f
+
+
 # --- config analyzer extra branches ---------------------------------------
 
 

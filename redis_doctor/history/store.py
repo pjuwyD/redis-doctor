@@ -7,6 +7,7 @@ password.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,35 @@ from typing import Any
 from ..models.report import Report
 
 DEFAULT_PATH = "~/.redis-doctor/history.db"
+
+
+def _trend_point(row: Any) -> dict[str, Any]:
+    """Extract one time-series point from a stored report row."""
+    point: dict[str, Any] = {
+        "id": row["id"],
+        "generated_at": row["generated_at"],
+        "target": row["target"],
+        "health_score": row["health_score"],
+        "memory_bytes": None,
+        "keys": None,
+        "idle_clients": None,
+        "stream_length": None,
+    }
+    try:
+        stats = json.loads(row["report_json"]).get("stats") or {}
+    except (ValueError, TypeError):
+        return point
+    ov = stats.get("overview") or {}
+    if isinstance(ov.get("memory"), dict):
+        point["memory_bytes"] = ov["memory"].get("used_bytes")
+    if isinstance(ov.get("keys"), dict):
+        point["keys"] = ov["keys"].get("total")
+    if isinstance(ov.get("clients"), dict):
+        point["idle_clients"] = ov["clients"].get("idle_over_1h")
+    streams = stats.get("streams")
+    if isinstance(streams, list):
+        point["stream_length"] = sum(s.get("length", 0) for s in streams if isinstance(s, dict))
+    return point
 
 
 class HistoryStore:
@@ -73,6 +103,22 @@ class HistoryStore:
                 """
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def trends(self) -> list[dict[str, Any]]:
+        """Time series of headline metrics per stored report, oldest first.
+
+        Each point carries the metrics charted by the GUI History tab. Metrics
+        are read from the stored report JSON (tolerant of missing fields on older
+        rows) rather than a fixed set of columns.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, generated_at, target, health_score, report_json
+                FROM reports ORDER BY id ASC
+                """
+            ).fetchall()
+        return [_trend_point(r) for r in rows]
 
     def get(self, report_id: int) -> Report | None:
         with self._connect() as conn:

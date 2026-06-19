@@ -19,11 +19,44 @@ class KeyspaceAnalyzer(Analyzer):
     name = "keyspace"
 
     def analyze(self, ctx: RunContext) -> list[Finding]:
+        findings: list[Finding] = []
+
+        # Per-DB summary from INFO keyspace (independent of the SCAN sample, which
+        # only covers the connected DB).
+        info = ctx.collected.get("info")
+        if info is not None and info.keyspace:
+            populated = {db: f for db, f in info.keyspace.items() if f.get("keys", 0) > 0}
+            if len(populated) > 1:
+                findings.append(
+                    Finding(
+                        id="keyspace.multiple_dbs",
+                        severity=Severity.INFO,
+                        category=Category.KEYSPACE,
+                        title=f"Keys spread across {len(populated)} logical databases",
+                        explanation=(
+                            "Using multiple numbered DBs is discouraged: it is "
+                            "unsupported in Redis Cluster, shares one memory/CPU budget, "
+                            "and has no per-DB access control. Sampling below covers "
+                            "only the connected DB."
+                        ),
+                        evidence={
+                            db: {"keys": f.get("keys", 0), "expires": f.get("expires", 0)}
+                            for db, f in sorted(
+                                populated.items(), key=lambda x: x[1].get("keys", 0), reverse=True
+                            )
+                        },
+                        suggested_checks=["redis-cli INFO keyspace"],
+                        suggested_fixes=[
+                            "Prefer key prefixes over numbered DBs",
+                            "Use separate Redis instances for separate workloads",
+                        ],
+                    )
+                )
+
         data = ctx.collected.get("keyspace")
         if data is None or data.sample.scanned == 0:
-            return []
+            return findings
 
-        findings: list[Finding] = []
         scanned = data.sample.scanned
         confidence = data.sample.confidence
 

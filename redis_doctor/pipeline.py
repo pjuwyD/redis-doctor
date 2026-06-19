@@ -427,6 +427,26 @@ def _build_overview(ctx: RunContext, info: ServerInfo | None) -> dict[str, Any]:
     elif info is not None:
         ov["keys"] = {"total": info.total_keys, "sampled": 0, "complete": True, "by_type": {}}
 
+    # Per-DB breakdown straight from INFO keyspace (all logical DBs, no extra
+    # reads). Sampling still targets the connected DB; this is a count summary.
+    if info is not None and info.keyspace:
+        dbs = []
+        for name, fields in info.keyspace.items():
+            keys = fields.get("keys", 0)
+            if keys <= 0:
+                continue
+            expires = fields.get("expires", 0)
+            dbs.append(
+                {
+                    "db": name,
+                    "keys": keys,
+                    "expires": expires,
+                    "no_ttl_pct": round(100 * (keys - expires) / keys, 1),
+                }
+            )
+        if dbs:
+            ov["databases"] = sorted(dbs, key=lambda d: d["keys"], reverse=True)
+
     streams = ctx.collected.get("streams")
     if streams is not None:
         ov["streams"] = {

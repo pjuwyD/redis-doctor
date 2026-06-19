@@ -40,6 +40,7 @@
       </p>
       <form id="explore-form">
         <input id="exp-target" type="text" placeholder="redis://localhost:6379" size="34" />
+        <input id="exp-db" type="number" min="0" placeholder="db" title="logical DB number (optional)" style="width:4.5rem" />
         <input id="exp-match" type="text" placeholder="match e.g. session:*" size="22" />
         <button type="submit">Scan</button>
         <button type="button" id="exp-functions">Scripts &amp; Functions</button>
@@ -83,6 +84,22 @@
     <section id="history" class="view">
       <h2>History</h2>
       <button id="refresh-history">Refresh</button>
+      <div id="trends" hidden>
+        <h3 class="section-h">Trends</h3>
+        <div class="trend-controls">
+          <label>Target <select id="trend-target"></select></label>
+          <label>Metric
+            <select id="trend-metric">
+              <option value="health_score">Health score</option>
+              <option value="memory_bytes">Memory used</option>
+              <option value="keys">Keys</option>
+              <option value="idle_clients">Idle clients (&gt;1h)</option>
+              <option value="stream_length">Stream length</option>
+            </select>
+          </label>
+        </div>
+        <canvas id="trend-chart" height="120"></canvas>
+      </div>
       <table id="history-table"><thead><tr>
         <th>ID</th><th>Time</th><th>Target</th><th>Score</th><th>Critical</th><th></th>
       </tr></thead><tbody></tbody></table>
